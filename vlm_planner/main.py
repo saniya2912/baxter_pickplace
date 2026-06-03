@@ -1,52 +1,64 @@
-"""Baxter pick-and-place VLM planner main entry point.
+"""Baxter 6-task VLM planner — main entry point.
 
 Workflow:
-  1. Load Gemma-3 VLM
-  2. Launch MuJoCo sim (connects to running openpi policy server)
-  3. Render current scene
-  4. Load goal image (from goal_images/ directory)
-  5. VLM plans the task sequence: current → goal
-  6. Execute each task; re-check goal after each one
-  7. Report result
+  1. Load Gemma-3-12B VLM.
+  2. Place all three blocks at their "start" positions (opposite of goal).
+  3. Render current scene; compare to goal image.
+  4. VLM plans the task sequence.
+  5. Execute each task with the pi0.5 position-control policy.
+  6. Re-check goal after each task; replan if needed.
 
-Usage:
+Prerequisites:
   # Terminal 1 — policy server
-  cd /path/to/openpi
-  uv run scripts/serve_policy.py \\
-      policy:checkpoint \\
-      --policy.config pi05_baxter_pickplace \\
-      --policy.dir checkpoints/pi05_baxter_pickplace/run_001/39999
+  cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
+  uv run scripts/serve_policy.py policy:checkpoint \\
+      --policy.config pi05_baxter_pickplace_pos \\
+      --policy.dir checkpoints/pi05_baxter_pickplace_pos/baxter_pickplace_pos_run3/199999
 
-  # Terminal 2 — this script
-  python vlm_planner/main.py --goal red_far_blue_near
-  python vlm_planner/main.py --goal red_near_blue_far --no-viewer
+  # Generate goal images (once)
+  cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
+  uv run python ~/Desktop/saniya_ws/baxter_pickplace/render_goal_images_6task.py
 
-Available goal names:
-  red_far_blue_near   — red block far, blue block near
-  red_near_blue_far   — red block near, blue block far
-  red_far_blue_far    — both blocks far
-  red_near_blue_near  — both blocks near
+  # Terminal 2 — run planner
+  cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
+  uv run python ~/Desktop/saniya_ws/baxter_pickplace/vlm_planner/main.py \\
+      --goal red_far_blue_near_green_far
 
-Generate goal images first (if not present):
-  python vlm_planner/render_goal_images.py
+Available goal names (all 8 combinations of red/blue/green × near/far):
+  red_far_blue_far_green_far     red_far_blue_far_green_near
+  red_far_blue_near_green_far    red_far_blue_near_green_near
+  red_near_blue_far_green_far    red_near_blue_far_green_near
+  red_near_blue_near_green_far   red_near_blue_near_green_near
 """
 
 import argparse
+import itertools
 import pathlib
 import sys
 
 import cv2
 import numpy as np
 
-HERE = pathlib.Path(__file__).parent
-GOAL_DIR = HERE / "goal_images"
+HERE     = pathlib.Path(__file__).parent
+GOAL_DIR = HERE / "goal_images_6task"
 
+# All 8 three-block goal configurations
 GOAL_NAMES = [
-    "red_far_blue_near",
-    "red_near_blue_far",
-    "red_far_blue_far",
-    "red_near_blue_near",
+    f"red_{r}_blue_{b}_green_{g}"
+    for r, b, g in itertools.product(("far", "near"), repeat=3)
 ]
+
+X_NEAR, X_FAR = 0.60, 0.75
+
+
+def _parse_goal_x(goal_name: str) -> tuple[float, float, float]:
+    """Extract red/blue/green X positions from a goal name string."""
+    parts = goal_name.split("_")
+    # Format: red_{far|near}_blue_{far|near}_green_{far|near}
+    red_x   = X_FAR if parts[1]  == "far" else X_NEAR
+    blue_x  = X_FAR if parts[3]  == "far" else X_NEAR
+    green_x = X_FAR if parts[5]  == "far" else X_NEAR
+    return red_x, blue_x, green_x
 
 
 def load_goal_image(goal_name: str) -> np.ndarray:
@@ -54,7 +66,9 @@ def load_goal_image(goal_name: str) -> np.ndarray:
     if not path.exists():
         sys.exit(
             f"[ERROR] Goal image not found: {path}\n"
-            f"Run: python vlm_planner/render_goal_images.py"
+            f"Generate goal images with:\n"
+            f"  uv run python ~/Desktop/saniya_ws/baxter_pickplace/"
+            f"render_goal_images_6task.py"
         )
     img = cv2.imread(str(path))
     if img is None:
@@ -63,82 +77,92 @@ def load_goal_image(goal_name: str) -> np.ndarray:
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__,
+    )
     parser.add_argument(
         "--goal", "-g", required=True, choices=GOAL_NAMES,
-        help="Goal configuration name (see available options above)"
+        metavar="GOAL",
+        help=(
+            "Goal configuration. Choose from:\n  " +
+            "\n  ".join(GOAL_NAMES)
+        ),
     )
     parser.add_argument(
         "--no-viewer", action="store_true",
-        help="Disable MuJoCo viewer window"
+        help="Disable MuJoCo viewer window",
     )
     parser.add_argument(
         "--max-rounds", type=int, default=3,
-        help="Maximum planning→execution rounds before giving up"
+        help="Maximum plan→execute rounds before giving up (default: 3)",
     )
     args = parser.parse_args()
 
-    # ── Import here to avoid slow startup if args are wrong ───────────────
     sys.path.insert(0, str(HERE))
     from vlm_planner import load_model, plan_tasks, check_goal_reached
-    from sim_runner import SimRunner
+    from sim_runner  import SimRunner
 
-    # ── Load VLM ──────────────────────────────────────────────────────────
+    # ── Load VLM ──────────────────────────────────────────────────────────────
     processor, vlm_model = load_model()
 
-    # ── Load goal image ───────────────────────────────────────────────────
+    # ── Load goal image ───────────────────────────────────────────────────────
     goal_bgr = load_goal_image(args.goal)
     print(f"[Main] Goal: {args.goal}")
-    print(f"[Main] Goal image: {GOAL_DIR / (args.goal + '.png')}")
 
-    # ── Launch sim ────────────────────────────────────────────────────────
+    # ── Launch sim and place blocks at "start" positions ──────────────────────
+    # Each block starts on the opposite side from its goal
+    red_goal_x, blue_goal_x, green_goal_x = _parse_goal_x(args.goal)
+    red_start_x   = X_NEAR if red_goal_x   == X_FAR else X_FAR
+    blue_start_x  = X_NEAR if blue_goal_x  == X_FAR else X_FAR
+    green_start_x = X_NEAR if green_goal_x == X_FAR else X_FAR
+
     runner = SimRunner(use_viewer=not args.no_viewer)
+    runner.reset_to_config(red_start_x, blue_start_x, green_start_x)
+    print(
+        f"[Main] Initial block positions: "
+        f"red={'far' if red_start_x == X_FAR else 'near'}  "
+        f"blue={'far' if blue_start_x == X_FAR else 'near'}  "
+        f"green={'far' if green_start_x == X_FAR else 'near'}"
+    )
 
     try:
         for round_idx in range(args.max_rounds):
             print(f"\n[Main] ── Round {round_idx + 1} / {args.max_rounds} ──")
 
-            # Render current scene
             current_bgr = runner.get_scene_image_bgr()
 
-            # Check if already done
             if check_goal_reached(current_bgr, goal_bgr, processor, vlm_model):
                 print("[Main] Goal already reached!")
                 break
 
-            # Plan
             tasks = plan_tasks(current_bgr, goal_bgr, processor, vlm_model)
             if not tasks:
                 print("[Main] VLM returned no tasks. Stopping.")
                 break
 
-            print(f"[Main] Planned tasks ({len(tasks)}):")
-            for i, t in enumerate(tasks):
-                print(f"  {i+1}. {t}")
+            print(f"[Main] Planned {len(tasks)} task(s):")
+            for i, t in enumerate(tasks, 1):
+                print(f"  {i}. {t}")
 
-            # Execute each task
             for task in tasks:
                 current_bgr = runner.run_task(task)
-
-                # Re-check after each task
                 if check_goal_reached(current_bgr, goal_bgr, processor, vlm_model):
-                    print(f"[Main] Goal reached after task: '{task}'")
+                    print(f"[Main] Goal reached after: '{task}'")
                     break
             else:
-                # All tasks done, check final state
                 if check_goal_reached(current_bgr, goal_bgr, processor, vlm_model):
-                    print("[Main] Goal reached after completing all planned tasks.")
+                    print("[Main] Goal reached after all planned tasks.")
                     break
                 else:
-                    print("[Main] Tasks completed but goal not reached. Replanning...")
+                    print("[Main] All tasks done but goal not reached. Replanning...")
                     continue
 
-            # Goal reached — exit outer loop
-            break
+            break   # goal reached in inner loop
         else:
             print(f"[Main] Gave up after {args.max_rounds} rounds.")
 
-        # Save final scene image
+        # Save final scene
         out_path = HERE / "final_scene.png"
         cv2.imwrite(str(out_path), runner.get_scene_image_bgr())
         print(f"\n[Main] Final scene saved to: {out_path}")

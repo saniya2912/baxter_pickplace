@@ -1,14 +1,16 @@
-"""Gemma-3 VLM planner for Baxter pick-and-place tasks.
+"""Gemma-3 VLM planner for Baxter pick-and-place tasks (6-task, 3-block version).
 
 Given a current scene image and a goal scene image, determines the ordered
 sequence of pick-and-place tasks needed to transform the current state into
 the goal state.
 
-Tasks are constrained to the 4 available robot capabilities:
+Tasks are constrained to the 6 policy capabilities (red / blue / green × near / far):
   - "move the red block to the far side"
   - "move the red block to the near side"
   - "move the blue block to the far side"
   - "move the blue block to the near side"
+  - "move the green block to the far side"
+  - "move the green block to the near side"
 """
 
 import sys
@@ -20,35 +22,37 @@ from PIL import Image
 
 
 MODEL_ID = "google/gemma-3-12b-it"
-MAX_TOKENS_PLAN  = 150
+MAX_TOKENS_PLAN  = 200
 MAX_TOKENS_CHECK = 60
+
+BLOCK_COLORS = ["red", "blue", "green"]
 
 AVAILABLE_TASKS = [
     "move the red block to the far side",
     "move the red block to the near side",
     "move the blue block to the far side",
     "move the blue block to the near side",
+    "move the green block to the far side",
+    "move the green block to the near side",
 ]
 
-_PLAN_PROMPT = """\
-You are controlling a robot arm that can perform pick-and-place operations.
-
-I will show you two images:
+# Per-block position query — asked once per colour, avoiding multi-block confusion.
+_BLOCK_POS_PROMPT = """\
+Look at these two images:
 - Image 1: the CURRENT scene
 - Image 2: the GOAL scene
 
-The table has a dividing line. Objects on the side closer to the robot are "near side"; \
-objects further away are "far side".
+The table has a dashed yellow dividing line across its width.
+- NEAR side = between the dividing line and the robot arm (bottom of the image).
+- FAR side  = the half of the table further from the robot arm (top of the image).
 
-Determine the ORDERED sequence of tasks to transform the current scene into the goal scene.
-Choose ONLY from these tasks (output task names exactly as written, one per line):
-- move the red block to the far side
-- move the red block to the near side
-- move the blue block to the far side
-- move the blue block to the near side
+Focus ONLY on the {color} block. Ignore all other blocks.
 
-If a block is already in the correct position, do NOT include a task for it.
-Output ONLY the task names, nothing else. If no tasks are needed, output "none".\
+Answer in EXACTLY this format (two lines, no extra text):
+current: near
+goal: far
+
+Replace "near"/"far" with the actual position of the {color} block in each image.\
 """
 
 _CHECK_PROMPT = """\
@@ -56,7 +60,10 @@ Look at these two images:
 - Image 1: the CURRENT scene
 - Image 2: the GOAL scene
 
-Are the red block and blue block in the same positions in both images?
+The table has a dashed dividing line. Near side = closer to the robot; far side = further away.
+
+Are ALL THREE blocks (red, blue, and green) on the same side of the dividing line \
+in both images?
 
 Answer ONLY "YES" or "NO".\
 """
@@ -117,26 +124,48 @@ def _query_two_images(processor, model, img1: Image.Image, img2: Image.Image,
     return processor.decode(output_ids[0][n_input:], skip_special_tokens=True).strip()
 
 
+def _parse_pos_response(response: str) -> tuple[str | None, str | None]:
+    """Extract (current_pos, goal_pos) from a per-block position response."""
+    current_pos = goal_pos = None
+    for line in response.lower().splitlines():
+        line = line.strip()
+        if line.startswith("current:"):
+            val = line.split(":", 1)[1].strip()
+            if "far" in val:
+                current_pos = "far"
+            elif "near" in val:
+                current_pos = "near"
+        elif line.startswith("goal:"):
+            val = line.split(":", 1)[1].strip()
+            if "far" in val:
+                goal_pos = "far"
+            elif "near" in val:
+                goal_pos = "near"
+    return current_pos, goal_pos
+
+
 def plan_tasks(current_bgr: np.ndarray, goal_bgr: np.ndarray,
                processor, model) -> list[str]:
-    """Return ordered list of task strings needed to reach the goal."""
+    """Query the VLM once per block colour and return the needed task list."""
     img1 = _bgr_to_pil(current_bgr)
     img2 = _bgr_to_pil(goal_bgr)
-    response = _query_two_images(processor, model, img1, img2,
-                                 _PLAN_PROMPT, MAX_TOKENS_PLAN)
-    print(f"[VLM plan] raw response:\n{response}\n")
-
     tasks = []
-    for line in response.splitlines():
-        line = line.strip().lower()
-        if line in ("none", ""):
+
+    for color in BLOCK_COLORS:
+        prompt  = _BLOCK_POS_PROMPT.format(color=color)
+        response = _query_two_images(processor, model, img1, img2, prompt,
+                                     max_new_tokens=20)
+        current_pos, goal_pos = _parse_pos_response(response)
+        print(f"[VLM {color:5s}] raw='{response}'  →  current={current_pos}  goal={goal_pos}")
+
+        if current_pos is None or goal_pos is None:
+            print(f"  [WARN] Could not parse {color} block position — skipping.")
             continue
-        # match against available tasks (case-insensitive)
-        for t in AVAILABLE_TASKS:
-            if t in line or line in t:
-                if t not in tasks:
-                    tasks.append(t)
-                break
+
+        if current_pos != goal_pos:
+            task = f"move the {color} block to the {goal_pos} side"
+            tasks.append(task)
+
     return tasks
 
 

@@ -115,6 +115,10 @@
     <body name="scene_camera_body" pos="1.0 -1.2 1.2">
       <camera name="scene_camera" xyaxes="0.832 0.555 0  -0.400 0.600 0.693" fovy="55"/>
     </body>
+    <!-- Top-down camera for VLM planning: near side (x=0.60) → LEFT, far side (x=0.75) → RIGHT -->
+    <body name="vlm_camera_body" pos="0.675 -0.15 1.05">
+      <camera name="vlm_camera" xyaxes="1 0 0  0 1 0" fovy="30"/>
+    </body>
 
     <!-- Lighting -->
     <light pos="0 0 4"   dir="0 0 -1"    diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="true"/>
