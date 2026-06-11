@@ -236,6 +236,30 @@ def run_trial(client, model, data, renderer, task_cfg, state_type, cfg, ctrl_rar
     return frames, log_rows, metrics
 
 
+def load_trial_metrics(log_path: pathlib.Path, task_cfg: dict) -> dict:
+    """Reconstruct metrics from a saved trial CSV without re-running the trial."""
+    with open(log_path) as f:
+        rows = list(csv.DictReader(f))
+    block_x_start = X_NEAR if task_cfg["dest"] == "far" else X_FAR
+    block_x_final = float(rows[-1]["block_x"])
+    displacement  = block_x_final - block_x_start
+    dest = task_cfg["dest"]
+    success = block_x_final > X_LINE + 0.02 if dest == "far" else block_x_final < X_LINE - 0.02
+    direction_correct = displacement > 0 if dest == "far" else displacement < 0
+    block_lifted = any(float(r["block_z"]) > LIFT_THRESHOLD for r in rows)
+    grips = [float(r["gripper_norm"]) for r in rows]
+    first_close = next((i for i, g in enumerate(grips) if g > 0.5), None)
+    return {
+        "success":            success,
+        "block_x_final":      round(block_x_final, 4),
+        "displacement":       round(displacement, 4),
+        "direction_correct":  direction_correct,
+        "block_lifted":       block_lifted,
+        "gripper_close_step": first_close,
+        "steps_taken":        len(rows),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint-name",  required=True,
@@ -281,28 +305,35 @@ def main():
         task_results = []
 
         for trial in range(args.n_trials):
-            frames, log_rows, metrics = run_trial(
-                client, model, data, renderer, task_cfg,
-                args.state_type, cfg, ctrl_rarm, ctrl_rg_l, ctrl_rg_r
-            )
-
-            # Save video
+            log_path   = task_dir / f"trial_{trial:02d}.csv"
             video_path = task_dir / f"trial_{trial:02d}.mp4"
-            imageio.mimwrite(str(video_path), frames, fps=10)
 
-            # Save log
-            log_path = task_dir / f"trial_{trial:02d}.csv"
-            with open(log_path, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=log_rows[0].keys())
-                writer.writeheader()
-                writer.writerows(log_rows)
+            if log_path.exists():
+                metrics = load_trial_metrics(log_path, task_cfg)
+                status = "✅" if metrics["success"] else "❌"
+                print(f"  trial {trial:02d}: {status}  [resumed from disk]  "
+                      f"block_x={metrics['block_x_final']:.3f}  "
+                      f"lift={'yes' if metrics['block_lifted'] else 'no'}  "
+                      f"dir={'✓' if metrics['direction_correct'] else '✗'}  "
+                      f"grip_step={metrics['gripper_close_step']}")
+            else:
+                frames, log_rows, metrics = run_trial(
+                    client, model, data, renderer, task_cfg,
+                    args.state_type, cfg, ctrl_rarm, ctrl_rg_l, ctrl_rg_r
+                )
 
-            task_results.append(metrics)
-            status = "✅" if metrics["success"] else "❌"
-            print(f"  trial {trial:02d}: {status}  block_x={metrics['block_x_final']:.3f}  "
-                  f"lift={'yes' if metrics['block_lifted'] else 'no'}  "
-                  f"dir={'✓' if metrics['direction_correct'] else '✗'}  "
-                  f"grip_step={metrics['gripper_close_step']}")
+                imageio.mimwrite(str(video_path), frames, fps=10)
+
+                with open(log_path, "w", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=log_rows[0].keys())
+                    writer.writeheader()
+                    writer.writerows(log_rows)
+
+                status = "✅" if metrics["success"] else "❌"
+                print(f"  trial {trial:02d}: {status}  block_x={metrics['block_x_final']:.3f}  "
+                      f"lift={'yes' if metrics['block_lifted'] else 'no'}  "
+                      f"dir={'✓' if metrics['direction_correct'] else '✗'}  "
+                      f"grip_step={metrics['gripper_close_step']}")
 
             all_summaries.append({
                 "checkpoint":      args.checkpoint_name,

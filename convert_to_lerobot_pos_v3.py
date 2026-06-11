@@ -27,12 +27,12 @@ IMG_H, IMG_W = 224, 224
 ROOT = pathlib.Path(__file__).parent
 
 TASK_DIRS = [
-    (ROOT / "data" / "pickplace_pos_v2" / "task_0", "move the red block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v2" / "task_1", "move the red block to the near side"),
-    (ROOT / "data" / "pickplace_pos_v2" / "task_2", "move the blue block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v2" / "task_3", "move the blue block to the near side"),
-    (ROOT / "data" / "pickplace_pos_v2" / "task_4", "move the green block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v2" / "task_5", "move the green block to the near side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_0", "move the red block to the far side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_1", "move the red block to the near side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_2", "move the blue block to the far side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_3", "move the blue block to the near side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_4", "move the green block to the far side"),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_5", "move the green block to the near side"),
 ]
 
 
