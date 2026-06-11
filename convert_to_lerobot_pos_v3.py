@@ -1,7 +1,8 @@
 """Convert v3 position-control Baxter demos to a LeRobot dataset.
 
 Changes from v2:
-  - Only successful episodes included (success=True filter)
+  - Far-side tasks: reuse v2 data unfiltered (same distribution as v2 training)
+  - Near-side tasks: new v3 recordings, success-filtered (~200+ clean per task)
   - 250 near-side demos per task recorded → ~200+ clean after filtering
   - Output repo_id: local/baxter_pickplace_pos_v3
 
@@ -26,13 +27,16 @@ IMG_H, IMG_W = 224, 224
 
 ROOT = pathlib.Path(__file__).parent
 
+# (path, language_label, filter_success)
+# Far-side: reuse v2 data unfiltered — "unchanged" per v3 design intent
+# Near-side: new v3 recordings, filter for success only
 TASK_DIRS = [
-    (ROOT / "data" / "pickplace_pos_v3" / "task_0", "move the red block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v3" / "task_1", "move the red block to the near side"),
-    (ROOT / "data" / "pickplace_pos_v3" / "task_2", "move the blue block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v3" / "task_3", "move the blue block to the near side"),
-    (ROOT / "data" / "pickplace_pos_v3" / "task_4", "move the green block to the far side"),
-    (ROOT / "data" / "pickplace_pos_v3" / "task_5", "move the green block to the near side"),
+    (ROOT / "data" / "pickplace_pos_v2" / "task_0", "move the red block to the far side",   False),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_1", "move the red block to the near side",  True),
+    (ROOT / "data" / "pickplace_pos_v2" / "task_2", "move the blue block to the far side",  False),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_3", "move the blue block to the near side", True),
+    (ROOT / "data" / "pickplace_pos_v2" / "task_4", "move the green block to the far side", False),
+    (ROOT / "data" / "pickplace_pos_v3" / "task_5", "move the green block to the near side",True),
 ]
 
 
@@ -44,18 +48,20 @@ class Args:
 
 
 def main(args: Args) -> None:
-    all_files: list[pathlib.Path] = []
-    for src_dir, label in TASK_DIRS:
+    # list of (path, filter_success)
+    all_files: list[tuple[pathlib.Path, bool]] = []
+    for src_dir, label, filter_success in TASK_DIRS:
         eps = sorted(src_dir.glob("episode_*.hdf5"))
         if not eps:
             raise FileNotFoundError(
                 f"No episode_*.hdf5 files found in {src_dir}\n"
                 f"  Expected task: '{label}'"
             )
-        print(f"  {len(eps):3d} episodes  ←  {src_dir.name}  ('{label}')")
-        all_files.extend(eps)
+        tag = "success-filtered" if filter_success else "all"
+        print(f"  {len(eps):3d} episodes  ←  {src_dir.parent.name}/{src_dir.name}  '{label}'  [{tag}]")
+        all_files.extend((ep, filter_success) for ep in eps)
 
-    print(f"\nTotal episodes to convert: {len(all_files)}")
+    print(f"\nTotal episode files to scan: {len(all_files)}")
 
     out_path = HF_LEROBOT_HOME / args.repo_id
     if out_path.exists():
@@ -98,10 +104,10 @@ def main(args: Args) -> None:
     task_counts: dict[str, int] = {}
 
     skipped = 0
-    for ep_path in tqdm.tqdm(all_files, desc="Converting episodes"):
+    for ep_path, filter_success in tqdm.tqdm(all_files, desc="Converting episodes"):
         with h5py.File(ep_path, "r") as f:
             success = bool(f["metadata"].attrs["success"])
-            if not success:
+            if filter_success and not success:
                 skipped += 1
                 continue
             images  = f["observations/image"][:]
