@@ -211,6 +211,7 @@ metadata/
 | `data/pickplace_pos/` | HDF5 demo files (position control) |
 | `data/pickplace/` | HDF5 demo files (velocity control, kept for reference) |
 | `checkpoints/pi05_baxter_pickplace/` | Trained velocity-control checkpoints (100k steps) |
+rogress Update
 
 ---
 

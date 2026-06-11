@@ -78,7 +78,8 @@ rm -rf checkpoints/pi05_baxter_pickplace_pos/baxter_pickplace_pos_run3/30000.orb
 
 uv run python scripts/train.py pi05_baxter_pickplace_pos \
     --exp-name baxter_pickplace_pos_run3 \
-    --resume
+    --resumerogress Update
+
 ```
 
 **Result:** Completed 200k steps on 2026-05-07.
