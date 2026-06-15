@@ -51,13 +51,9 @@ run_eval() {
 
 cd $OPENPI
 
-# 0 — pi05_base (zero-shot)
-run_eval \
-    "pi05_base" \
-    "pi05_baxter_pickplace_pos_v2" \
-    "$HOME/.cache/openpi/openpi-assets/checkpoints/pi05_base" \
-    "pos11" \
-    "0,1,2,3,4,5"
+# 0 — pi05_base (zero-shot): SKIPPED
+# The base checkpoint has no LoRA weights but pi05_baxter_pickplace_pos_v2 config expects them.
+# A zero-shot baseline would need a dedicated non-LoRA inference config.
 
 # 1 — velocity control pick-and-place (4 tasks only)
 run_eval \

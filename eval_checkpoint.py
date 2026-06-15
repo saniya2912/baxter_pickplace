@@ -335,6 +335,7 @@ def main():
                       f"dir={'✓' if metrics['direction_correct'] else '✗'}  "
                       f"grip_step={metrics['gripper_close_step']}")
 
+            task_results.append(metrics)
             all_summaries.append({
                 "checkpoint":      args.checkpoint_name,
                 "task_id":         task_id,
@@ -352,7 +353,7 @@ def main():
         print(f"  → success={sr:.0f}%  dir_acc={dir_acc:.0f}%  "
               f"lifted={lift_pct:.0f}%  mean_disp={mean_disp:+.3f}m")
 
-    # Save summary CSV
+    # Save summary CSV Do yo
     summary_path = out_base / "summary.csv"
     with open(summary_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=all_summaries[0].keys())
