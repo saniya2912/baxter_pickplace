@@ -80,62 +80,62 @@ For each checkpoint × task × trial:
 
 ## Results
 
-*To be filled in after evaluation runs.*
+*Updated 2026-06-15. pi05_base uses the true pretrained weights (no fine-tuning) with a non-LoRA config. pos_v3 pending training completion.*
 
 ### Success Rate (per task, 10 trials)
 
 | Task | pi05_base | vel 99k | pos_run3 199k | pos_v2 499k | pos_v3 |
 |------|-----------|---------|----------------|-------------|--------|
-| 0 red → far | — | — | — | — | — |
-| 1 red → near | — | — | — | — | — |
-| 2 blue → far | — | — | — | — | — |
-| 3 blue → near | — | — | — | — | — |
-| 4 green → far | — | — | N/A | — | — |
-| 5 green → near | — | — | N/A | — | — |
-| **Total** | **/6** | **/4** | **/6** | **/6** | **/6** |
+| 0 red → far | 7/10 | 0/10 | 1/10 | 6/10 | — |
+| 1 red → near | 2/10 | 0/10 | 2/10 | 4/10 | — |
+| 2 blue → far | 0/10 | 0/10 | 8/10 | 7/10 | — |
+| 3 blue → near | 0/10 | 0/10 | 0/10 | 5/10 | — |
+| 4 green → far | 0/10 | N/A | 1/10 | 2/10 | — |
+| 5 green → near | 0/10 | N/A | 0/10 | 0/10 | — |
+| **Total** | **9/60** | **0/40** | **12/60** | **24/60** | **/60** |
 
 ### Direction Accuracy (% of trials where block moved correct direction)
 
 | Task | pi05_base | vel 99k | pos_run3 199k | pos_v2 499k | pos_v3 |
 |------|-----------|---------|----------------|-------------|--------|
-| 0 red → far | — | — | — | — | — |
-| 1 red → near | — | — | — | — | — |
-| 2 blue → far | — | — | — | — | — |
-| 3 blue → near | — | — | — | — | — |
-| 4 green → far | — | — | N/A | — | — |
-| 5 green → near | — | — | N/A | — | — |
+| 0 red → far | 100% | 0% | 50% | 100% | — |
+| 1 red → near | 40% | 0% | 50% | 40% | — |
+| 2 blue → far | 20% | 0% | 80% | 100% | — |
+| 3 blue → near | 0% | 0% | 0% | 50% | — |
+| 4 green → far | 10% | N/A | 50% | 80% | — |
+| 5 green → near | 0% | N/A | 0% | 0% | — |
 
 ### Block Lifted (% of trials where true pick-and-place occurred)
 
 | Task | pi05_base | vel 99k | pos_run3 199k | pos_v2 499k | pos_v3 |
 |------|-----------|---------|----------------|-------------|--------|
-| 0 red → far | — | — | — | — | — |
-| 1 red → near | — | — | — | — | — |
-| 2 blue → far | — | — | — | — | — |
-| 3 blue → near | — | — | — | — | — |
-| 4 green → far | — | — | N/A | — | — |
-| 5 green → near | — | — | N/A | — | — |
+| 0 red → far | 80% | 0% | 20% | 70% | — |
+| 1 red → near | 20% | 0% | 30% | 50% | — |
+| 2 blue → far | 0% | 0% | 30% | 90% | — |
+| 3 blue → near | 0% | 0% | 30% | 60% | — |
+| 4 green → far | 0% | N/A | 10% | 30% | — |
+| 5 green → near | 0% | N/A | 10% | 0% | — |
 
 ### Mean Block Displacement (m, signed — positive = moved far)
 
 | Task | pi05_base | vel 99k | pos_run3 199k | pos_v2 499k | pos_v3 |
 |------|-----------|---------|----------------|-------------|--------|
-| 0 red → far | — | — | — | — | — |
-| 1 red → near | — | — | — | — | — |
-| 2 blue → far | — | — | — | — | — |
-| 3 blue → near | — | — | — | — | — |
-| 4 green → far | — | — | N/A | — | — |
-| 5 green → near | — | — | N/A | — | — |
+| 0 red → far | +0.127 | +0.000 | +0.022 | +0.116 | — |
+| 1 red → near | -0.015 | +0.000 | -0.020 | -0.031 | — |
+| 2 blue → far | +0.003 | +0.000 | +0.128 | +0.126 | — |
+| 3 blue → near | +0.001 | +0.000 | +0.054 | -0.056 | — |
+| 4 green → far | -0.000 | N/A | +0.022 | +0.063 | — |
+| 5 green → near | +0.000 | N/A | +0.033 | +0.005 | — |
 
 ### Mean Gripper Close Step
 
 | Task | pi05_base | vel 99k | pos_run3 199k | pos_v2 499k | pos_v3 |
 |------|-----------|---------|----------------|-------------|--------|
-| 0 red → far | — | — | — | — | — |
-| 1 red → near | — | — | — | — | — |
-| 2 blue → far | — | — | — | — | — |
-| 3 blue → near | — | — | — | — | — |
-| 4 green → far | — | — | N/A | — | — |
-| 5 green → near | — | — | N/A | — | — |
+| 0 red → far | 69 | 762 | 73 | 76 | — |
+| 1 red → near | 77 | 940 | 110 | 114 | — |
+| 2 blue → far | 4 | 179 | 195 | 254 | — |
+| 3 blue → near | 5 | 183 | 166 | 147 | — |
+| 4 green → far | 4 | N/A | 92 | 74 | — |
+| 5 green → near | 4 | N/A | 81 | 90 | — |
 
 > Expected gripper close from demos (10 Hz equivalent): steps 75–107
