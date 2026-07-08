@@ -1,0 +1,1432 @@
+
+
+\documentclass[conference, 12pt]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ===== IEEE TITLE =====
+% \documentclass[conference, 12pt]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ===== PACKAGES =====
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{pgfgantt}
+\usepackage{subcaption}
+\usepackage{cite}
+
+% Code listing style
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!60!black},
+}
+
+
+\input{includes_ieee}
+\begin{document}
+
+% ===== INSERT YOUR CUSTOM TITLE PAGE =====
+\newcommand{\reporttitle}{Human-Robot Collaboration  through VLA-based Learning}
+\newcommand{\reportauthor}{Saniya Patwardhan}
+\newcommand{\reporttype}{MRes Late Stage Gateway Report}
+\newcommand{\cid}{06059013}
+
+
+% include files that load packages and define macros
+ % various packages needed for maths etc.
+% \input{notation} % short-hand notation and macros
+\input{titlepage}
+
+
+% ===== TITLE =====
+\title{Human-Robot Collaboration using VLA-based Learning}
+
+\author{
+\IEEEauthorblockN{Saniya Patwardhan}
+\IEEEauthorblockA{MRes Late Stage Report}
+}
+
+\maketitle
+
+% ===== ABSTRACT =====
+
+\begin{abstract}
+Human--robot collaboration requires robots to understand high-level goals while performing reliable manipulation. Although Vision--Language--Action (VLA) models enable end-to-end mapping from visual observations and language instructions to robot actions, adapting them to novel robot embodiments remains challenging.
+
+This project investigates the adaptation of the $\pi$0.5 Vision--Language--Action model to a Baxter robot in a custom MuJoCo environment. A demonstration collection pipeline, LoRA-based fine-tuning framework, and real-time inference system were developed to evaluate multiple policy variants. Experimental findings show that transitioning from velocity-control to position-control improved manipulation performance and highlighted the importance of train--inference consistency during VLA adaptation.
+
+A Vision--Language Model (VLM) planner generates manipulation sequences from current and goal workspace configurations. As planner development was presented in the Early Stage Gateway report, this report focuses on the development and evaluation of the fine-tuned VLA policy.
+
+Project updates, demonstrations, and source code are available at \texttt{https://saniya2912.github.io/pi05-baxter/}.
+\end{abstract}
+
+
+% ===== SECTION 1 =====
+\section{Literature Review}
+
+Human--robot collaboration (HRC) aims to enable humans and robots to work together by leveraging their complementary capabilities \cite{ajoudani2018progress}. The emergence of collaborative robots has enabled safe operation in shared workspaces without physical barriers \cite{robotics8040100}. While these systems have improved physical interaction, many still rely on separate perception, planning, and control modules, limiting their ability to adapt to changing task goals.
+
+Recent work has addressed different aspects of collaborative reasoning. SAGE \cite{kuang2025sage} estimates human actions and gaze, Therblig-based methods \cite{reinhardt2024therblig} represent manipulation as structured primitives, and long-horizon planning approaches \cite{Chen_2025} decompose complex tasks into executable action sequences. Visual instruction understanding has also been demonstrated using LEGO assembly benchmarks \cite{wang2022translating,walsman2022break}. Although effective, these methods typically depend on handcrafted task representations or specialised pipelines, limiting generalisation.
+
+Prior to emergence of Vision--Language--Action (VLA) models, systems such as SayCan \cite{ahn2022icanisay} combined large language models with predefined robotic skills for language-guided planning. While effective for structured tasks, they relied on manually designed skill libraries rather than end-to-end visuomotor learning.
+
+Recent VLA models instead learn a direct mapping from visual observations and language instructions to robot actions. RT-1 \cite{brohan2023rt1roboticstransformerrealworld} demonstrated large-scale robotic learning, while RT-2 \cite{brohan2023rt2visionlanguageactionmodelstransfer} incorporated vision--language pretraining to improve semantic reasoning. Open-source models such as OpenVLA \cite{kim2024openvlaopensourcevisionlanguageactionmodel} and SmolVLA \cite{shukor2025smolvlavisionlanguageactionmodelaffordable} have made VLA research more accessible, while the state-of-the-art $\pi$0 \cite{black2026pi0visionlanguageactionflowmodel} and $\pi$0.5 \cite{intelligence2025pi05visionlanguageactionmodelopenworld} models introduce flow matching to predict chunks of future actions, improving continuous manipulation. However, most VLA research focuses on policy learning rather than adaptation to new robot embodiments or integration with high-level planning.
+
+Natural language has also become an important interface for human--robot interaction. Wang \textit{et al.} \cite{wang2026bidirectionalhumanrobotcommunicationphysical} proposed a framework for modifying robot trajectories through language, while VLA-bot \cite{WANG2026103268} combines multimodal perception with manipulation for collaborative assembly tasks. However, neither investigates efficient adaptation of large pretrained VLA models to novel robotic platforms.
+
+Overall, recent advances in multimodal robotics have significantly improved robot perception, planning, and manipulation. Vision--Language--Action models show particular promise as general-purpose robotic policies, motivating further investigation into their adaptation and integration within collaborative robotic systems.
+
+
+% \subsection{Research Context and Motivation}
+% % Why HRC is important
+% % Why natural language interaction is desirable
+% % Limitations of traditional robotics pipelines
+
+% \subsection{Research Question}
+% % Can a VLM-VLA hierarchy enable goal-directed HRC?
+% % Current stage vs final dissertation goal
+
+% \subsection{Research Objectives}
+% % Fine-tune pi0.5 on Baxter
+% % Develop vision-language planner
+% % Integrate planner and policy
+% % Enable human intervention and replanning
+% \subsection{Research Gap}
+
+% Although there has been significant progress in human-robot collaboration, VLA models, and multimodal learning, existing systems do not combine task understanding, human monitoring, and action execution within a single framework. In particular, there is a lack of systems that can convert high-level goals into simple, verifiable subtasks and continuously monitor task progress in real-world settings. Thus, this work focuses on
+
+% \begin{itemize}
+%     \item breaking down high-level goals into simple, visually verifiable subtask conditions,
+%     \item monitoring whether a human is performing subtasks correctly using visual input,
+%     \item converting visual understanding into structured representations for reasoning, and
+%     \item connecting task understanding with vision--language--action models for execution of the subtasks which are not performed by the human
+% \end{itemize}
+
+% This work proposes a hybrid VLM+VLA framework that performs task decomposition and real-time monitoring, as a step toward more adaptive human--robot collaboration.
+
+\section{Research Gap}
+
+Despite recent advances in Vision--Language--Action (VLA) models, three key challenges remain. First, efficient adaptation study of pretrained VLA models to novel robot embodiments with different kinematics, camera viewpoints, and control interfaces remains underexplored. Second, high-level task planning and low-level manipulation are typically addressed separately, with few hierarchical frameworks integrating Vision--Language Models (VLMs) and VLA policies. Finally, limited attention has been given to the engineering decisions that influence VLA adaptation, including action representation, demonstration generation, and train--inference consistency.
+
+This research addresses these challenges by adapting the $\pi$0.5 Vision--Language--Action model to a Baxter robot, evaluating key engineering decisions during fine-tuning, and integrating the resulting manipulation policy with a Vision--Language planner for goal-directed task execution.
+
+\subsection{Research Questions}
+
+\begin{enumerate}
+    \item How effectively can a pretrained Vision--Language--Action model be adapted to a novel robot embodiment?
+
+    \item How do engineering decisions, including action representation, demonstration generation, and train--inference consistency, affect manipulation performance?
+
+    \item Can a Vision--Language Model be integrated with a fine-tuned Vision--Language--Action policy to achieve goal-directed manipulation?
+\end{enumerate}
+
+% ======================================================
+
+\section{Methodology}
+
+% \subsection{Research Approach}
+
+% This project adopts an iterative quantitative engineering approach to investigate the adaptation of the $\pi$0.5 Vision--Language--Action model to a novel robot embodiment. Successive fine-tuning experiments were conducted using different action representations, datasets, and state observations, with policy performance evaluated after each iteration to guide subsequent system refinements.
+
+\subsection{Overall System Architecture}
+
+The proposed framework (Fig.~\ref{fig:system_architecture}) follows a hierarchical architecture consisting of a Vision--Language Model (VLM) planner and a Vision--Language--Action (VLA) policy.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/Late_Stage Update.jpg}
+    \caption{Proposed system architecture.}
+    \label{fig:system_architecture}
+\end{figure*}
+
+The Gemma-3-12B VLM compares the current and goal workspace images to generate an ordered sequence of manipulation primitives. Each primitive is provided as a language instruction to a fine-tuned $\pi$0.5 policy, which generates robot actions from visual observations and robot state information. The actions are executed within a MuJoCo simulation environment. Separating planning from execution enables independent evaluation of each component and supports future replanning when the workspace changes.
+
+\subsection{Choice of Platform}
+
+\subsubsection{Robot DE NIRO}
+
+Robot DE NIRO (Fig.~\ref{fig:deniro}) was selected as the long-term deployment platform due to its Baxter dual-arm configuration, mobile base, and human-centred design, making it well suited to future human--robot collaboration research. Although this work focuses on simulation, the system was developed with future deployment on DE NIRO in mind.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/De_Niro.png}
+    \caption{Design Engineering's Natural Interaction Robot (DE NIRO).}
+    \label{fig:deniro}
+\end{figure}
+
+\subsubsection{MuJoCo Simulation}
+
+Development was performed in the MuJoCo physics simulator to enable rapid experimentation, safe debugging, and automated demonstration collection. Simulation also allowed train--inference mismatches to be identified and resolved before deployment, providing a reliable environment for policy development and evaluation.
+
+
+\subsubsection{$\pi$0.5}
+
+The $\pi$0.5 \cite{intelligence2025pi05visionlanguageactionmodelopenworld} Vision-Language-Action (VLA) model released by Physical Intelligence was selected as the foundation policy for this research. The model combines visual observations, robot state information, and natural language instructions to generate robot actions directly from high-level task descriptions.
+
+Several factors motivated its selection. First, $\pi$0.5 has demonstrated strong manipulation performance across multiple robotic embodiments. Second, the release includes a training and inference framework that can be adapted to custom robotic platforms. Finally, the model supports parameter-efficient fine-tuning, making experimentation feasible within the computational resources available for this project.
+
+Compared to other open VLA models such as OpenVLA, $\pi$0.5 employs a flow-matching architecture that predicts action chunks rather than individual actions. This enables more expressive trajectory modelling and was considered particularly suitable for the sequential manipulation tasks investigated in this work. A comparison between the two approaches is shown in Table~\ref{tab:openvla_pi05}.
+
+\begin{table}[h]
+\centering
+\caption{Comparison of OpenVLA and $\pi$0.5}
+\label{tab:openvla_pi05}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{3cm} p{3cm}}
+\hline
+\textbf{OpenVLA} & \textbf{$\pi$0.5} \\
+\hline
+Open-source model & Research release \\
+Autoregressive actions & Flow-matching actions \\
+Single-step prediction & Action chunk prediction \\
+Simpler training paradigm & Advanced trajectory modelling \\
+Easier deployment & Stronger manipulation modelling \\
+\hline
+\end{tabular}
+\end{table}
+
+% ==================================================
+
+% \subsection{Vision-Language-Action Adaptation Strategy}
+
+% \subsubsection{Need for Fine-Tuning}
+
+% % What pi0.5 was originally trained on
+% % Novel embodiment problem
+% % Different kinematics
+% % Different cameras
+% % Different workspace
+% % Why zero-shot transfer is insufficient
+
+% \subsubsection{Choice of pi0.5}
+
+% % State-of-the-art VLA
+% % Open source
+% % Available training pipeline
+% % Strong manipulation performance
+
+% \subsubsection{Parameter-Efficient Adaptation using LoRA}
+
+% % What LoRA is
+% % Why not full fine-tuning
+% % GPU limitations
+% % Faster experimentation
+% % Preserves pretrained knowledge
+
+\subsection{Vision-Language-Action Adaptation Strategy}
+\subsubsection{Need for Fine-Tuning}
+
+Although Vision--Language--Action (VLA) models are pretrained on diverse robots and manipulation tasks, direct deployment on a new robot is challenging due to differences in kinematics, camera placement, workspace configuration, and control interfaces. The Baxter platform and structured block-manipulation tasks introduced in Section \ref{task_design} differ substantially from the original $\pi$0.5 training data, making fine-tuning necessary. The objective is therefore to adapt the pretrained policy to the target robot and task using a relatively small demonstration dataset rather than training a policy from scratch.
+
+\subsubsection{Parameter-Efficient Adaptation using LoRA}
+
+Low-Rank Adaptation (LoRA) was used to fine-tune the pretrained $\pi$0.5 model. Instead of updating all 3 billion parameters, LoRA freezes the pretrained model and trains low-rank adapters within the attention layers.
+
+Adapters were applied to both the 2B-parameter PaliGemma vision-language backbone and the 300M-parameter action expert. Using a rank of 16 resulted in approximately 30--50 million trainable parameters and reduced GPU memory usage to around 17~GB, enabling training on a single RTX 5090 GPU.
+
+LoRA enabled efficient evaluation of multiple datasets, action representations, and state configurations while preserving the pretrained model's visual and language capabilities.
+
+% ==================================================
+
+% \subsection{Development of the Demonstration Collection Pipeline}
+
+% \subsubsection{Task Design}
+
+% % Why six primitive tasks
+% % Building blocks for planner
+
+% \subsubsection{Damped Least Squares Inverse Kinematics}
+
+% % What DLS IK is
+% % Mathematical formulation
+% % Why chosen
+
+% \subsubsection{Scripted Demonstration Collection}
+
+% % Why demonstrations required
+% % Why scripted instead of teleoperation
+
+% \subsubsection{Dataset Processing}
+
+% % LeRobot conversion
+% % Dataset structure
+\subsection{Development of the Demonstration Collection Pipeline}
+A demonstration collection pipeline was developed to generate task-specific data for fine-tuning the $\pi$0.5 model. Demonstrations were generated through scripted execution in MuJoCo, providing repeatable and scalable data collection. The pipeline consisted of four stages: task design, inverse kinematics trajectory generation, demonstration recording, and conversion to the LeRobot dataset format.
+
+\subsubsection{Task Design}
+\label{task_design}
+
+The target task is to transform an initial block arrangement into a user-specified goal configuration. To simplify learning, the problem was decomposed into six reusable manipulation primitives involving three coloured blocks placed on a tabletop divided into near and far regions (Fig.~\ref{fig:robot_tabletop}).
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{images/goal.png}
+    \caption{Tabletop workspace for execution of primitive tasks}
+    \label{fig:robot_tabletop}
+\end{figure}
+
+\begin{itemize}
+\item Move the red block to the near side
+\item Move the red block to the far side
+\item Move the blue block to the near side
+\item Move the blue block to the far side
+\item Move the green block to the near side
+\item Move the green block to the far side
+\end{itemize}
+
+These primitives can be combined by the VLM planner to perform more complex rearrangement tasks.
+
+
+\subsubsection{Damped Least Squares Inverse Kinematics}
+
+To generate demonstrations, a controller capable of reliably executing pick-and-place trajectories was required.
+
+For a desired end-effector displacement $\Delta x$, the corresponding joint update $\Delta q$ is computed as
+
+\begin{equation}
+\Delta q = J^T (JJ^T + \lambda^2 I)^{-1}\Delta x
+\end{equation}
+
+where $J$ is the manipulator Jacobian and $\lambda$ is the damping coefficient.
+
+DLS inverse kinematics was selected for its numerical stability near singular configurations and its compatibility with both simulation and future deployment on the physical robot.
+
+% An additional advantage of the DLS formulation is its compatibility with both simulation and physical deployment. The same inverse kinematics framework can be transferred to the physical robot for future demonstration collection, reducing the amount of redevelopment required during later project stages.
+
+\subsubsection{Scripted Demonstration Collection}
+
+Demonstrations were generated autonomously through a scripted pick-and-place controller implemented within the MuJoCo simulation environment.
+
+Each episode followed a structured sequence consisting of:
+
+\begin{enumerate}
+\item Move to a pre-grasp position above the target block.
+\item Descend towards the block.
+\item Close the gripper and establish grasp contact.
+\item Lift the object above the workspace.
+\item Transport the object to the target region.
+\item Lower the object and release the grasp.
+\item Return to a neutral configuration.
+\end{enumerate}
+
+Scripted execution ensured consistent demonstrations and enabled rapid dataset generation without teleoperation. To improve generalisation, block positions were randomised at the start of each episode while maintaining task feasibility. A total of 600 demonstrations were collected, with 100 demonstrations for each primitive task.
+
+
+\subsubsection{Dataset Processing}
+Recorded demonstrations were converted to the LeRobot dataset format required by the $\pi$0.5 training framework. Each sample contained workspace and wrist camera images, robot state information, a language instruction, and the corresponding action target. Dataset validation verified trajectory integrity and observation–action consistency before fine-tuning.
+
+% ==================================================
+
+% \subsection{Design of the Action Representation}
+
+% \subsubsection{Initial Velocity-Control Formulation}
+
+% \subsubsection{Observed Failure Modes}
+
+% \subsubsection{Transition to Position Control}
+
+% \subsubsection{Expected Benefits}
+\subsection{Design of the Action Representation}
+Two action representations were evaluated. Initial experiments used the velocity-control formulation of the original $\pi$0.5 framework, in which the policy predicts joint velocities. This was later replaced with position control, where the policy predicts target joint positions and a proportional controller generates the corresponding robot motions. The transition required new demonstrations with future joint configurations as action targets. Its impact on manipulation performance is evaluated in Section~\ref{sec:findings}.
+
+
+
+% ==================================================
+
+% \subsection{Fine-Tuning and Inference Pipeline}
+
+% \subsubsection{Training Configuration}
+
+% % LoRA settings
+% % Training steps
+% % Hardware
+
+% \subsubsection{Inference Architecture}
+
+% % Policy server
+% % WebSocket
+% % Observation-action flow
+\subsection{Fine-Tuning and Inference Pipeline}
+
+The collected demonstrations were used to fine-tune the pretrained $\pi$0.5 model using the OpenPI training framework and datasets formatted according to the LeRobot specification.
+
+\subsubsection{Training Configuration}
+
+Each training sample consisted of workspace and wrist camera images, robot state information, and a language instruction. The model was trained to predict the corresponding action sequence using LoRA adapters, while the pretrained backbone remained frozen. Multiple training runs were performed to evaluate different action representations, datasets, and state configurations, with checkpoints saved every 10,000 training steps.
+
+\subsubsection{Inference Architecture}
+
+A two-process inference framework was developed consisting of a GPU-based policy server and a MuJoCo simulation client communicating via WebSocket. At each timestep, the client sends camera observations, robot state information, and the task instruction to the policy server. The server applies the same preprocessing used during training, performs inference with the fine-tuned $\pi$0.5 model, and returns an action chunk for execution.
+
+For position-control policies, predicted joint positions are executed by a proportional controller within MuJoCo. This framework provides a consistent environment for checkpoint evaluation and policy comparison.
+
+\begin{table}[h]
+\centering
+\caption{Fine-tuning configuration}
+\label{tab:finetune_config}
+\small
+\begin{tabular}{ll}
+\hline
+Model & $\pi$0.5 \\
+Adaptation & LoRA \\
+Framework & OpenPI \\
+Dataset & LeRobot \\
+Training Steps & Various (100k-500k)\\
+Checkpoint Interval & 10k \\
+Hardware & RTX 5090 (32 GB) \\
+\hline
+\end{tabular}
+\end{table}
+
+
+% % ==================================================
+
+% \subsection{Vision-Language Planner}
+
+% \subsubsection{Choice of Gemma-3-12B}
+
+% \subsubsection{Goal-State Reasoning}
+
+% \subsubsection{Task Sequence Generation}
+\subsection{Vision-Language Planner}
+
+A Vision-Language Model (VLM) was introduced to provide high-level task planning within the proposed human-robot collaboration framework. While the fine-tuned $\pi$0.5 policy executes individual manipulation primitives, it has no knowledge of the desired final scene configuration. The VLM planner addresses this limitation by converting a goal scene into an ordered sequence of manipulation primitives (Fig.~\ref{fig:VLM_planner}).
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{images/VLM_planner.png}
+\caption{High-level VLM planning pipeline.}
+\label{fig:VLM_planner}
+\end{figure}
+
+\subsubsection{Planner Implementation}
+
+Gemma-3-12B was selected due to its multimodal reasoning capabilities and ability to jointly process images and text. The planner receives the current workspace image together with a goal-state image and identifies the differences between the two scenes. Prompt engineering constrains the model to output only the manipulation primitives listed in Table~\ref{tab:planner_primitives}.
+
+To improve reliability, each coloured block is evaluated independently rather than reasoning about all objects simultaneously. For every mismatch between the current and goal scene, the planner generates the corresponding manipulation primitive. These primitives are then passed sequentially to the fine-tuned $\pi$0.5 policy as natural language instructions.
+
+\begin{table}[h]
+\centering
+\caption{Manipulation primitives used by the planner}
+\label{tab:planner_primitives}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{ll}
+\hline
+\textbf{Object} & \textbf{Primitive Actions} \\
+\hline
+Red   & Move Near, Move Far \\
+Blue  & Move Near, Move Far \\
+Green & Move Near, Move Far \\
+\hline
+\end{tabular}
+\end{table}
+
+This hierarchical decomposition enables the robot to perform object arrangements that were never explicitly demonstrated during training. 
+
+
+% ==================================================
+
+% \subsection{Evaluation Methodology}
+
+% \subsubsection{Primitive Skill Success}
+
+% \subsubsection{Manipulation Success}
+
+% \subsubsection{Collaborative Task Success}
+\subsection{Evaluation Methodology}
+
+The final objective of this research is to develop a hierarchical human-robot collaboration system capable of transforming an initial workspace into a user-specified goal configuration. Since this capability depends on multiple intermediate components, evaluation was performed at three levels: primitive skill success, manipulation success, and collaborative task success.
+
+\subsubsection{Primitive Skill Success}
+
+Primitive skill success evaluates whether the policy performs the requested task. A trial is considered successful if the specified coloured block reaches the correct side of the workspace following the language instruction. This metric measures task understanding without considering the quality of manipulation.
+
+\subsubsection{Manipulation Success}
+
+Manipulation success evaluates execution quality. A successful trial requires the robot to complete the full pick-and-place sequence:
+
+\begin{enumerate}
+\item Approach the target object.
+\item Grasp the object.
+\item Lift the object.
+\item Transport it to the target region.
+\item Release the object.
+\end{enumerate}
+
+Unlike primitive skill success, this metric excludes accidental task completion caused by pushing or unintended collisions.
+
+\subsubsection{Collaborative Task Success}
+\label{sec:collab_metric}
+Collaborative task success represents the final evaluation objective of the project. Starting from an initial workspace configuration, the complete planner-policy system must rearrange all objects to match a user-specified goal configuration. Success therefore depends on correct task planning and successful execution of every manipulation primitive.
+
+Evaluation of dynamic human intervention and replanning will be completed during the final stage of the project.
+
+\subsubsection{Checkpoint Comparison}
+
+Throughout development, multiple policy checkpoints (refer Table \ref{tab:checkpoints}) were trained using different action representations, datasets, and state observations. Comparative evaluation was performed through rollout analysis and task success assessment to determine the impact of each engineering decision. Particular emphasis was placed on comparing velocity-control and position-control policies, with the resulting findings presented in Section~\ref{sec:findings}.
+
+\begin{table}[t]
+  \centering
+  \caption{Policy checkpoints evaluated throughout development.}
+  \label{tab:checkpoints}
+  \small
+  \setlength{\tabcolsep}{4pt}   % default is 6pt
+  \begin{tabular}{lll}
+  \toprule
+  \textbf{Checkpoint} & \textbf{Steps}
+  & \textbf{Key change} \\
+  \midrule
+  \texttt{pi05\_base}       & —      &
+  Zero-shot; no fine-tuning \\
+  \texttt{vel\_100k}         & 100k   &
+  Velocity control; 4 tasks \\
+  \texttt{pos\_200k}        & 200k   &
+  Position control; 6 tasks \\
+  \texttt{pos\_v2}    & 500k   &
+  Native 10\,Hz; 11-dim state \\
+  \texttt{pos\_v3}          & $+$200k &
+  Warm-start v2; $\times$2.5 near
+  demos \\
+  \bottomrule
+  \end{tabular}
+  \vspace{5mm}
+  \textit{Note:} 4 tasks = Tasks with only red and blue blocks.
+  \end{table}
+
+
+% ======================================================
+
+% \section{Execution and Design Engineering Application}
+
+% \subsection{Iterative Development Process}
+% % Engineering cycle
+% % Build-test-analyse-improve
+
+% \subsection{Evolution of the System}
+% % Single task
+% % Multi-task
+% % Velocity control
+% % Position control
+
+% \subsection{Key Engineering Decisions}
+% % Most impactful design choices
+% % Trade-offs and reasoning
+
+\section{Execution and Design Engineering Application}
+
+The project followed an iterative engineering design process in which experimental findings continuously informed subsequent system development. Rather than implementing the complete collaborative framework in a single stage, individual components were developed, evaluated, and refined before integration.
+
+Key engineering contributions included the development of a custom MuJoCo simulation environment, a scripted Damped Least Squares inverse kinematics data collection pipeline, adaptation of the $\pi$0.5 Vision-Language-Action model through LoRA fine-tuning, redesign of the action representation from velocity to position control, and implementation of a hierarchical Vision-Language planner for task sequencing. Each component was validated independently before integration into the complete planner-policy framework.
+
+This incremental development strategy reduced hardware risk, enabled rapid experimentation, and allowed individual design decisions to be evaluated systematically before progressing towards end-to-end human-robot collaboration.
+
+
+% ======================================================
+
+% \section{Preliminary Findings and Insights}
+
+% \subsection{Development Progress Overview}
+% % Summary of achievements
+
+% \subsection{Velocity-Control Policy Evaluation}
+% % Results
+% % Failure cases
+
+% \subsection{Train-Inference Mismatch Analysis}
+% % Problems discovered
+% % Root causes
+
+% \subsection{Position-Control Policy Evaluation}
+% % Results after redesign
+% % Improvements observed
+
+% \subsection{Checkpoint Comparison}
+% % Run1
+% % Run2
+% % Run3
+% % Emerging trends
+
+% \subsection{Vision-Language Planner Validation}
+% % Planner outputs
+% % Example plans
+
+% \subsection{Current Limitations}
+% % Grasp precision
+% % Robustness
+% % Integration challenges
+
+% \section{Preliminary Findings and Insights}
+% \label{sec:findings}
+
+% \subsection{Velocity-Control Policy Evaluation}
+
+% Initial fine-tuning experiments employed a velocity-control action representation in which the policy directly predicted joint velocity commands. The resulting policy demonstrated evidence of language grounding and task understanding, consistently approaching the correct coloured block in response to the provided language instruction.
+
+% Despite this promising behaviour, reliable manipulation was not achieved. The policy frequently approached the target object but failed to execute stable grasps, often pushing the block rather than lifting it. Analysis suggested that the velocity-control formulation coupled arm motion and gripper timing, making it difficult for the model to learn the precise sequence of actions required for successful pick-and-place behaviour.
+
+% These experiments provided an important insight: the model had learned the relationship between visual observations, language instructions, and task objectives, but struggled to translate this understanding into precise manipulation actions. This observation motivated further investigation into train--inference mismatches and ultimately led to the transition towards position-control actions.
+
+% \subsection{Analysis of Train--Inference Mismatches}
+
+% A significant portion of the project involved identifying discrepancies between demonstration generation and policy deployment. Several train--inference mismatches were discovered during evaluation and were found to have a substantial impact on policy performance.
+
+% The first major issue involved incorrect action targets during dataset generation. Actions were initially recorded as small position deltas derived from velocity commands, resulting in target magnitudes of approximately 0.001 radians after downsampling. Consequently, the trained policy produced negligible arm motion during inference. Correcting the action targets to represent the desired joint configuration at the subsequent timestep resolved this issue and enabled meaningful motion generation.
+
+% Further investigation identified a grasp alignment error in which the gripper consistently stopped approximately 2--3 cm above the block centre during demonstration collection. While seemingly minor, this discrepancy prevented stable grasp formation and caused objects to slip from the gripper during execution. Adjustments to the descent trajectory and grasp tolerance reduced this error to approximately 1 mm and significantly improved grasp quality.
+
+% Additional deployment-specific issues were also identified, including gripper initialisation mismatches following simulator reset and gripper hysteresis effects occurring within generated action chunks. Addressing these problems improved consistency between training and deployment conditions and highlighted the importance of careful alignment between data collection, training, and inference procedures.
+
+% \subsection{Position-Control Policy Evaluation}
+
+% To address the limitations observed in velocity-control experiments, the action representation was redesigned to predict target joint positions rather than joint velocities. Under this formulation, a proportional controller was responsible for converting predicted target positions into executable robot motions.
+
+% The resulting policies demonstrated noticeably improved manipulation behaviour. Compared to the velocity-control formulation, the robot generated smoother trajectories, more stable object approach motions, and more consistent grasp attempts. The generated behaviour more closely resembled the trajectories observed within the demonstration dataset and exhibited fewer cumulative execution errors.
+
+% Although robust manipulation performance has not yet been achieved across all tasks, position-control policies consistently outperformed their velocity-control counterparts and established a stronger foundation for future deployment on physical hardware.
+
+% \subsection{Checkpoint Comparison and Policy Evolution}
+
+% A total of four major policy variants were evaluated throughout the project: the zero-shot $\pi$0.5 baseline, a velocity-control policy trained for 100k steps, a position-control policy trained for 200k steps (\texttt{pos\_run3\_199999}), and an improved position-control policy trained for 500k steps with an expanded state representation (\texttt{pos\_v2\_499999}). Each checkpoint was evaluated using a consistent protocol consisting of 10 trials per task. Success was defined as moving the block to the correct side of the workspace divider.
+
+% The zero-shot baseline failed all tasks, confirming that direct deployment of the pretrained model to the Baxter embodiment was not feasible and motivating the need for task-specific adaptation. The first fine-tuned policy (\texttt{vel\_pickplace\_99999}) demonstrated clear evidence of task understanding, consistently approaching the correct object in response to language instructions. However, the policy never learned reliable grasp execution and typically pushed the block rather than picking it up.
+
+% The transition to position control resulted in a substantial behavioural improvement. The \texttt{pos\_run3\_199999} checkpoint was trained on a six-task dataset consisting of 600 demonstrations and achieved successful completion of three out of six tasks. Notably, all successful tasks corresponded to movements towards the far side of the workspace, while all near-side tasks failed.
+
+% Detailed evaluation of the \texttt{pos\_run3\_199999} checkpoint provided insight into the remaining failure modes. The strongest result was observed for the red-to-far task, where the robot achieved a successful grasp, transported the block in the correct direction, and placed it only 1.5 cm short of the success threshold. In contrast, other failures were primarily associated with grasp precision, including a 5 cm grasp miss on the blue block and a 29 mm vertical alignment error when grasping the green block. These observations suggest that the policy had learned the overall structure of the manipulation task but lacked the precision required for consistent task completion.
+
+% To address these limitations, a second-generation dataset and training configuration were developed. The \texttt{pos\_v2\_499999} checkpoint introduced native 10 Hz demonstration recording, eliminating the need for temporal downsampling, and expanded the robot state representation from 8 dimensions to 11 dimensions through the inclusion of end-effector Cartesian coordinates. Training duration was increased from 200k to 500k steps, reducing the final training loss from approximately 0.008--0.015 to 0.004. Despite these improvements, evaluation resulted in only two successful tasks out of six, with near-side tasks continuing to present a significant challenge.
+
+% An important finding emerging from checkpoint comparison is that lower training loss did not necessarily correspond to improved task performance. The largest behavioural improvements throughout the project were achieved through modifications to the action representation and demonstration collection process rather than through increasing training duration alone. This observation suggests that train--inference consistency and action-space design exert a greater influence on manipulation performance than optimisation progress alone.
+
+% \begin{table*}[h]
+% \centering
+% \caption{Summary of checkpoint progression}
+% \label{tab:checkpoint_progression}
+% \renewcommand{\arraystretch}{1.2}
+% \begin{tabular}{p{2.8cm} p{1.2cm} p{1.5cm} p{3.8cm}}
+% \hline
+% \textbf{Checkpoint} & \textbf{Steps} & \textbf{Success} & \textbf{Key Observation} \\
+% \hline
+% \texttt{pi05\_base} & -- & 0\% & No Baxter-specific behaviour observed. \\
+% \texttt{vel\_pickplace\_99999} & 100k & 0\% & Correct object selection but no successful grasps. \\
+% \texttt{pos\_run3\_199999} & 200k & 50\% & Strongest manipulation behaviour; all far-side tasks successful. \\
+% \texttt{pos\_v2\_499999} & 500k & 33.3\% & Lower training loss but limited improvement in task success. \\
+% \hline
+% \end{tabular}
+% \end{table*}
+
+
+
+% ============================================================
+%  Section V — Preliminary Findings and Insights
+%  Drop-in replacement for the existing Section V.
+%  Requires packages: booktabs, multirow, graphicx, subcaption, pgfplots, xcolor
+%  Table numbers continue from Table III (planner primitives).
+%  Adjust \label{tab:...} cross-references to match your numbering.
+% ============================================================
+
+\section{Preliminary Findings and Insights}
+\label{sec:findings}
+\subsection{Velocity-Control Policy Evaluation}
+Initial fine-tuning experiments employed a velocity-control action representation in which the policy predicted joint velocity commands. The policy demonstrated clear language grounding by consistently approaching the correct coloured block, indicating that it had learned the relationship between visual observations, language instructions, and task objectives.
+
+However, reliable manipulation was not achieved. The \texttt{vel\_100k} checkpoint achieved a 0\% success rate across 40 evaluation trials and failed to lift the block in any trial (Table~\ref{tab:success}). Mean gripper close steps of 762 and 940 for the red-far and red-near tasks indicate that the gripper remained open throughout most of the episode, causing the robot to push the block rather than grasp it.
+
+These results suggested that the policy had learned \emph{what} task to perform but not \emph{how} to execute it. This motivated further investigation into train--inference mismatches and the subsequent transition to position-control actions.
+
+Analysis indicated that the poor performance could not be explained solely by the action representation, motivating investigation of the complete training and deployment pipeline.
+
+
+\subsection{Analysis of Train--Inference Mismatches}
+\label{sec:latch_fix}
+A significant part of the project involved identifying train--inference mismatches that limited policy performance. Four major issues were identified and resolved.
+
+The first involved incorrect action targets during dataset generation. Actions were initially recorded as small position deltas derived from velocity commands, producing target magnitudes of approximately 0.001~rad after downsampling. Consequently, the policy generated negligible arm motion during inference (mean action magnitude $\sim$0.001~rad compared to the expected 0.05--0.3~rad). This was resolved by recording the desired joint configuration at the subsequent timestep rather than position deltas.
+
+A second issue was a grasp alignment error. During demonstration collection, the gripper consistently stopped 2--3~cm above the block due to an overly conservative descent tolerance. Diagnostic logging showed a vertical error of 28--30~mm. Reducing the descent target to $z_\text{block}-0.010$~m with a tolerance of 0.010~m reduced the error to within 1~mm.
+
+Two deployment-specific issues were also identified:
+
+\begin{itemize}
+\item \textbf{Gripper initialisation mismatch:} After simulator reset, the gripper control signal remained partially closed (\texttt{gripper\_norm} $\approx$ 0.65), causing the policy to immediately enter carry mode. Resetting the control signal to the open position restored the expected initial state.
+
+\item \textbf{Gripper hysteresis:} The flow-matching policy occasionally generated close--open--close commands within a single action chunk, causing dropped objects during transport. This was resolved by latching the gripper closed after a successful grasp and releasing only when a placement command was detected.
+\end{itemize}
+
+These observations demonstrate that train--inference consistency is as important as the training configuration itself. Figure~\ref{fig:state_mismatch} illustrates the gripper state before and after the initialisation fix.
+
+\begin{figure}[t] \centering \includegraphics[width=\columnwidth]{images/04_state_mismatch.png} \caption{Gripper state (normalised) observed by the policy over a 150-step episode, illustrating the initialisation mismatch: without the fix (dashed), the policy perceives gripper\_norm~$\approx 0.65$ at step~0 and immediately enters carry mode. After the fix (solid), the policy correctly begins with gripper\_norm~$= 0.0$ and executes the intended approach--grasp sequence.} \label{fig:state_mismatch} \end{figure}
+
+
+\subsection{Position-Control Policy Evaluation}
+
+To address the limitations observed in velocity-control experiments, the action
+representation was redesigned to predict target joint positions rather than joint
+velocities.
+Under this formulation, a proportional controller converts predicted targets into
+executable velocity commands:
+\begin{equation}
+    v = \operatorname{clip}\!\left(K_P\,(q_{\mathrm{target}} - q),\;
+        -v_{\max},\; v_{\max}\right)
+    \label{eq:pctrl}
+\end{equation}
+with $K_P = 40$ and $v_{\max} = 1.5$~rad/s.
+This separates the \emph{where} (learned by the policy) from the \emph{how fast}
+(handled by the controller), substantially simplifying the learning problem by allowing the policy to predict desired configurations while low-level control is handled separately. In practice, smoother trajectories, more stable object approach motions, and more consistent grasp attempts.
+The \texttt{pos\_200k} checkpoint achieved 20\% trial-level success
+(12/60 trials) compared to 0\% for the velocity-control baseline,
+with the block-lifted rate rising from 0\% to 10--30\% across tasks that
+had previously shown no successful manipulation.
+Position-control policies were therefore adopted as the standard representation
+for all subsequent training runs.
+
+\subsection{Checkpoint Comparison and Policy Evolution}
+
+Five policy checkpoints were evaluated across the full six-task protocol
+(10 trials per task, 60 trials per checkpoint, except the velocity-control checkpoint
+which covers four tasks only).
+The checkpoints represent successive design iterations:
+\texttt{pi05\_base} (zero-shot), \texttt{vel\_100k} (100k steps,
+velocity control), \texttt{pos\_200k} (200k steps, position control),
+\texttt{pos\_v2} (500k steps, native 10~Hz recording, 11-dim state), and
+\texttt{pos\_v3} (200k warm-start fine-tuning steps from \texttt{pos\_v2},
+augmented near-side demonstrations).
+
+\subsubsection{Trial-Level Success Rate}
+
+Table~\ref{tab:success} reports per-task trial-level success rates across all
+checkpoints.
+A trial is successful if the specified block reaches the correct side of the
+workspace divider ($x > 0.70$~m for far; $x < 0.66$~m for near).
+
+% ------------------------------------------------------------------
+%  TABLE: Per-task trial-level success rate
+% ------------------------------------------------------------------
+\begin{table*}[t]
+\centering
+\caption{Per-task trial-level success rate (successes / 10 trials).
+$\dagger$: green-block tasks were not in the velocity-control training set.
+Best-performing checkpoint shown in bold.}
+\label{tab:success}
+\setlength{\tabcolsep}{5pt}
+\small
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+\textbf{Task} & \textbf{Instruction} &
+    \textbf{pi05\_base} &
+    \textbf{vel 100k} &
+    \textbf{pos 200k} &
+    \textbf{pos\_v2} &
+    \textbf{pos\_v3} \\
+\midrule
+T0 & Move red block $\to$ far   & 7/10 & 0/10 & 1/10 & 6/10 & \textbf{9/10} \\
+T1 & Move red block $\to$ near  & 2/10 & 0/10 & 2/10 & 4/10 & \textbf{4/10} \\
+T2 & Move blue block $\to$ far  & 0/10 & 0/10 & \textbf{8/10} & 7/10 & \textbf{9/10} \\
+T3 & Move blue block $\to$ near & 0/10 & 0/10 & 0/10 & \textbf{5/10} & 4/10 \\
+T4 & Move green block $\to$ far & 0/10 & $-^\dagger$ & 1/10 & 2/10 & 0/10\\
+T5 & Move green block $\to$ near& 0/10 & $-^\dagger$ & 0/10 & 0/10 & 0/10\\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Overall (trial-level)}} &
+    9/60 (15\%) & 0/40 (0\%) & 12/60 (20\%) & 24/60 (40\%) & \textbf{26/60 (43\%)} \\
+\multicolumn{2}{@{}l}{\quad Far-side average} &
+    23\% & 0\% & 33\% & 50\% & \textbf{60\%} \\
+\multicolumn{2}{@{}l}{\quad Near-side average} &
+    7\% & 0\% & 13\% & 30\% & 27\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Several findings emerge from Table~\ref{tab:success}.
+First, the zero-shot \texttt{pi05\_base} baseline achieves a non-trivial 15\%
+overall success rate (9/60 trials), with particularly strong performance on T0
+(7/10, 70\% success).
+This result --- which contrasts with the na\"{i}ve expectation that the pretrained
+model would entirely fail on an unseen embodiment --- confirms that $\pi$0.5 retains
+transferable manipulation priors, while also demonstrating that fine-tuning is
+necessary for reliable multi-task performance.
+
+Second, a consistent far-side advantage is observed across all fine-tuned
+position-control checkpoints (far average: 20--60\%; near average: 7--30\%).
+Near-side carry requires the arm to move inward toward the robot base, which
+conflicts with the DLS null-space configuration and produces less consistent
+training demonstrations.
+
+Third, green-block tasks (T4, T5) represent a persistent failure mode across
+all checkpoints, including \texttt{pos\_v3} which was explicitly augmented with
+250 near-side green demonstrations per task.
+The green block's position ($y = +0.05$~m toward the robot midline) requires
+an arm configuration that approaches joint limits, and the \texttt{pos\_v3}
+checkpoint shows \emph{regression} on T4 (2/10 $\to$ 0/10) relative to
+\texttt{pos\_v2}, suggesting that the lower learning rate warm-start did not
+provide sufficient gradient signal for this task. Further experiments will investigate the influence of workspace position on manipulation performance to determine whether object location contributes to the observed differences in task success.
+
+\subsubsection{Manipulation Quality: Block-Lifted Rate}
+
+Task success alone conflates true pick-and-place with accidental push success.
+Table~\ref{tab:lifted} disaggregates these by reporting the block-lifted rate,
+defined as the fraction of trials in which the block exceeded $z > 0.295$~m
+(above table height of 0.260~m plus block half-height of 0.025~m),
+confirming a genuine grasp-and-lift occurred.
+
+% ------------------------------------------------------------------
+%  TABLE: Block-lifted rate
+% ------------------------------------------------------------------
+\begin{table*}[t]
+\centering
+\caption{Block-lifted rate (\% of trials in which true pick-and-place was executed,
+i.e.\ block\_z $> 0.295$~m during the episode).
+The gap between this table and Table~\ref{tab:success} indicates push-based
+rather than pick-based success. \textbf{Bold}: highest per task.}
+\label{tab:lifted}
+\setlength{\tabcolsep}{5pt}
+\small
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+\textbf{Task} & \textbf{Instruction} &
+    \textbf{pi05\_base} &
+    \textbf{vel 100k} &
+    \textbf{pos 200k} &
+    \textbf{pos\_v2 500k} &
+    \textbf{pos\_v3} \\
+\midrule
+T0 & Move red block $\to$ far   & 80\% & 0\% & 20\% & 70\% & \textbf{90\%} \\
+T1 & Move red block $\to$ near  & 20\% & 0\% & 30\% & 50\% & \textbf{70\%} \\
+T2 & Move blue block $\to$ far  & 0\%  & 0\% & 30\% & \textbf{90\%} & 80\% \\
+T3 & Move blue block $\to$ near & 0\%  & 0\% & 30\% & \textbf{60\%} & \textbf{70\%} \\
+T4 & Move green block $\to$ far & 0\%  & $-$ & 10\% & \textbf{30\%} & 0\% \\
+T5 & Move green block $\to$ near& 0\%  & $-$ & 10\% & 0\% & 0\% \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Mean lifted rate (all tasks)}} &
+    17\% & 0\% & 22\% & \textbf{50\%} & 45\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Comparing Tables~\ref{tab:success} and~\ref{tab:lifted} reveals an important
+discrepancy for the \texttt{pos\_200k} checkpoint at T2 (blue $\to$ far):
+8/10 task-success but only 30\% lift rate, indicating that the majority of
+T2 successes were achieved through inadvertent pushing rather than controlled
+pick-and-place.
+Post-hoc grasp diagnostics confirmed a mean grasp error of
+$(-155,\,-78,\,-2)$~mm for T2: the gripper closed 15.5~cm laterally displaced
+from the block, and arm translation displaced the block to the far side.
+
+By contrast, the \texttt{pos\_v2} checkpoint achieves a lift rate well above its task-success rate for T2 (90\% lifted vs.\ 70\% success), confirming genuine pick-and-place. The \texttt{pos\_v3} checkpoint shows closer agreement between lift and success rates for blue tasks (80\% lifted vs.\ 90\% success on T2; 70\% vs.\ 40\% on T3), consistent with more reliable grasp execution overall.
+
+\subsubsection{Direction Accuracy}
+
+Table~\ref{tab:direction} reports the fraction of trials in which the block was
+displaced in the correct direction (positive $x$-displacement for far tasks,
+negative for near tasks), regardless of whether the success threshold was crossed.
+This metric measures task understanding independently of execution precision.
+
+% ------------------------------------------------------------------
+%  TABLE: Direction accuracy + mean displacement
+% ------------------------------------------------------------------
+\begin{table*}[t]
+\centering
+\caption{Direction accuracy (\% of trials with correct-direction block displacement)
+and mean signed block displacement (m; positive = toward far side).
+Direction accuracy measures task understanding; displacement quantifies
+proximity to success for near-miss trials.}
+\label{tab:direction}
+\setlength{\tabcolsep}{4.5pt}
+\small
+\begin{tabular}{@{}llcccccccccc@{}}
+\toprule
+& & \multicolumn{5}{c}{\textbf{Direction Accuracy (\%)}} &
+    \multicolumn{5}{c}{\textbf{Mean Displacement (m)}} \\
+\cmidrule(lr){3-7}\cmidrule(lr){8-12}
+\textbf{Task} & \textbf{Instruction} &
+    Base & Vel & Pos & V2 & V3 &
+    Base & Vel & Pos & V2 & V3 \\
+\midrule
+T0 & Red $\to$ far   & 100 & 0  & 50  & 100 & 100 & $+0.127$ & $+0.000$ & $+0.022$ & $+0.116$ & $+0.159$ \\
+T1 & Red $\to$ near  & 40  & 0  & 50  & 40  & 40  & $-0.015$ & $+0.000$ & $-0.020$ & $-0.031$ & $-0.022$ \\
+T2 & Blue $\to$ far  & 20  & 0  & 80  & 100 & 90  & $+0.003$ & $+0.000$ & $+0.128$ & $+0.126$ & $+0.121$ \\
+T3 & Blue $\to$ near & 0   & 0  & 0   & 50  & 40  & $+0.001$ & $+0.000$ & $+0.054$ & $-0.056$ & $-0.024$ \\
+T4 & Green $\to$ far & 10  & $-$& 50  & 80  & 0   & $-0.000$ & $-$      & $+0.022$ & $+0.063$ & $+0.000$ \\
+T5 & Green $\to$ near& 0   & $-$& 0   & 0   & 0   & $+0.000$ & $-$      & $+0.033$ & $+0.005$ & $+0.000$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Direction accuracy reveals task understanding that is not captured by binary
+success metrics.
+The \texttt{pos\_v2} checkpoint achieves 100\% direction accuracy on both T0
+and T2 and 80\% on T4, yet its task success on T4 remains only 20\%.
+This confirms that the policy understands which direction to move for these tasks
+but lacks the precision to cross the success threshold.
+By contrast, the \texttt{pos\_v3} checkpoint regresses to 0\% direction
+accuracy on T4 (green $\to$ far), consistent with the collapsed prediction
+behaviour (arm hovering at pregrasp for 600 steps) observed during diagnostic
+rollouts.
+
+\subsubsection{Training Metrics and Loss--Performance Relationship}
+
+Table~\ref{tab:training} summarises the training configurations and final
+loss values for all fine-tuned checkpoints.
+
+% ------------------------------------------------------------------
+%  TABLE: Training metrics
+% ------------------------------------------------------------------
+\begin{table}[t]
+\centering
+\caption{Training configuration and final metrics for each fine-tuned checkpoint.}
+\label{tab:training}
+\small
+
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Config} & \textbf{Steps} & \textbf{Demos} &
+\textbf{State} & \textbf{Loss} \\
+\midrule
+vel      & 100k   & 400 & 8D  & -- \\
+pos      & 200k   & 600 & 8D  & 0.008--0.015 \\
+pos\_v2  & 500k   & 600 & 11D & 0.004 \\
+pos\_v3  & +200k  & 950 & 11D & $<$0.004 \\
+\bottomrule
+\end{tabular}
+
+\vspace{1mm}
+
+\begin{minipage}{\columnwidth}
+\footnotesize
+\textit{Note:} All checkpoints used a peak learning rate of
+$2\times10^{-4}$ except \texttt{pos\_v3}, which used $5\times10^{-5}$.
+\end{minipage}
+
+\end{table}
+
+A key finding is that lower training loss does not correspond monotonically to
+improved task performance.
+The \texttt{pos\_v2} checkpoint achieves a final loss of 0.004 --- substantially
+lower than \texttt{pos\_200k} (0.008--0.015) --- yet achieves only marginal
+improvement in overall task success (40\% vs.\ 20\%).
+More strikingly, \texttt{pos\_v2} achieves fewer successes than
+\texttt{pos\_200k} on T2 (7/10 vs.\ 8/10) despite training 2.5$\times$ longer.
+These observations indicate that the primary bottleneck is not optimisation
+depth but rather the quality of training data (demonstration frequency,
+state representation, and grasp precision).
+The introduction of native 10~Hz demonstration recording and end-effector
+Cartesian coordinates in \texttt{pos\_v2} had a greater qualitative effect
+on lifting behaviour (mean lifted rate 50\% vs.\ 22\%) than on raw task success.
+
+
+\subsubsection{Failure Mode Analysis}
+
+Analysis of policy rollouts identified grasp precision as the dominant remaining failure mode. Although the policy consistently selected the correct object and generated appropriate approach trajectories, small spatial errors during gripper alignment frequently prevented successful object pickup. Additional failures included premature gripper release during transport and occasional policy collapse, in which the robot remained near the pre-grasp pose throughout the episode. Refer Table \ref{tab:gripper}.
+
+An important observation was the difference in performance between workspace regions. Tasks requiring movement towards the far side achieved higher success rates than equivalent near-side tasks, suggesting that the latter were underrepresented within the training data or more difficult to execute due to workspace geometry.
+
+Overall, the failure analysis indicates that the policy has learned the high-level structure of the manipulation task but remains limited by execution accuracy rather than task understanding. These observations motivated the expanded demonstration dataset and additional fine-tuning experiments presented in the following section.
+
+% \subsubsection{Gripper Timing Analysis}
+
+% Table~\ref{tab:gripper} reports the mean step at which the gripper first closes
+% (gripper\_norm $> 0.5$) across trials for each checkpoint.
+% Expected close step from demonstrations is 75--107.
+
+% % ------------------------------------------------------------------
+% %  TABLE: Gripper close step
+% % ------------------------------------------------------------------
+\begin{table}[t]
+\centering
+\caption{Mean gripper close step (10-Hz policy steps) per task and checkpoint.
+Expected range from scripted demonstrations: red/green tasks: 75–107; blue tasks: ~150–160.
+Late closure ($>$150) indicates the policy is approaching before closing;
+early closure ($<$20) indicates premature grasping.}
+\label{tab:gripper}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Task} & \textbf{Base} & \textbf{Vel} & \textbf{Pos} & \textbf{V2} & \textbf{V3} &
+    \textbf{Demo} \\
+\midrule
+T0 & 69  & 762 & 73  & 76  & 36  & 75--107 \\
+T1 & 77  & 940 & 110 & 114 & 64  & 75--107 \\
+T2 & 4   & 179 & 195 & 254 & 157 & 75--107 \\
+T3 & 5   & 183 & 166 & 147 & 154 & 75--107 \\
+T4 & 4   & $-$ & 92  & 74  & 51  & 75--107 \\
+T5 & 4   & $-$ & 81  & 90  & 60  & 75--107 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% The zero-shot baseline closes very early on blue and green tasks (steps 4--5),
+% indicating spurious grasping behaviour with no spatial grounding.
+% The velocity-control checkpoint shows the opposite extreme (762--940 steps),
+% consistent with the gripper never closing during the pick phase.
+% Position-control checkpoints show progressive improvement in timing alignment
+% with the demonstration distribution.
+% However, \texttt{pos\_v3} closes earlier than expected on red tasks
+% (steps 36 and 64 vs.\ the 75--107 demo range), suggesting the augmented
+% near-side demonstrations --- which involve a faster scripted carry phase ---
+% have biased the policy toward earlier grasping.
+
+\subsubsection{Zero-Shot Baseline Analysis}
+
+The \texttt{pi05\_base} checkpoint result (15\% overall success, 7/10 on T0)
+warrants explicit discussion.
+The original $\pi$0.5 model has no Baxter-specific fine-tuning, yet achieves
+80\% block-lift rate and 100\% direction accuracy on T0.
+This is consistent with $\pi$0.5's pre-training on large-scale diverse robot
+manipulation data: the model's pretrained manipulation priors partially
+generalise to the Baxter workspace and camera configuration.
+
+The performance collapse on blue and green blocks (0/10 success, near-zero
+lift rates) demonstrates the limits of zero-shot generalisation:
+the pretrained model cannot reliably distinguish between the three block colours
+from the current camera viewpoint, defaulting to the dominant pretraining
+behaviour (approaching objects in the centre of the scene, which corresponds
+to the red block's position).
+This motivates fine-tuning as a mechanism not only for embodiment adaptation
+but for task routing across multiple objects with distinct spatial locations.
+
+% \begin{figure}[t]
+%     \centering
+%     % Suggested figure: grouped bar chart of trial-level success rates
+%     % per task (x-axis) with one bar per checkpoint (colour-coded legend).
+%     % Generate with matplotlib using data from Table~\ref{tab:success}.
+%     % Save to: figures/success_bar_chart.pdf
+%     %
+%     % Placeholder:
+%     \includegraphics[width=\columnwidth]{images/success_bar_chart.pdf}
+%     \caption{Per-task trial-level success rates across all five checkpoints
+%     (\texttt{pi05\_base}, \texttt{vel~100k}, \texttt{pos~200k},
+%     \texttt{pos\_v2~500k}, \texttt{pos\_v3}).
+%     Far-side tasks (T0, T2, T4) consistently outperform their near-side
+%     counterparts (T1, T3, T5) for all fine-tuned position-control checkpoints.
+%     Green block tasks (T4, T5) show no improvement beyond the 200k-step
+%     checkpoint despite additional training and demonstrations.}
+%     \label{fig:success_bar}
+% \end{figure}
+
+\begin{figure}[t]
+    \centering
+    % Suggested figure: 2x3 grid of scene camera stills from a pos_v3
+    % successful trial on T0 (red-far), showing:
+    % (a) initial configuration, (b) pre-grasp approach, (c) gripper descent,
+    % (d) block lifted (z>0.295m), (e) carry to far side, (f) block placed.
+    % Extract frames from videos/checkpoint_comparison/pos_v3/.
+    %
+    % Placeholder:
+       \setlength{\tabcolsep}{0pt}
+\begin{tabular}{ccc}
+        \includegraphics[width=0.30\columnwidth]{images/a_initial.png} &
+        \includegraphics[width=0.30\columnwidth]{images/b_approach.png} &
+        \includegraphics[width=0.30\columnwidth]{images/c_descent.png} \\
+        \small (a) Initial & \small (b) Approach & \small (c) Descent \\[4pt]
+        \includegraphics[width=0.30\columnwidth]{images/d_lift.png} &
+        \includegraphics[width=0.30\columnwidth]{images/e_carry.png} &
+        \includegraphics[width=0.30\columnwidth]{images/f_place.png} \\
+        \footnotesize (d) Lift ($z{=}0.35$\,m) & \footnotesize (e) Carry ($x{=}0.75$\,m) & \footnotesize (f) Place ($x{=}0.76$\,m) \\
+    \end{tabular}
+    \caption{Execution sequence for a successful red-block far-side trial
+    (\texttt{pos\_v3}, T0, trial~00, 9/10 success rate).
+    The policy executes a complete pick-and-place sequence:
+    approach, descent to within 3~mm of block centre, lift to 0.37~m,
+    carry across the workspace divider, and controlled placement.
+    Final block position: $x = 0.779$~m (success threshold: $x > 0.70$~m).}
+    \label{fig:exec_sequence}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{images/06_chunk_repetition.png}
+    \caption{Illustration of gripper hysteresis within a single 10-step action chunk
+    (T1, \texttt{pos\_200k}, trial~00): the flow-matching denoiser produces a
+    close--open--close pattern at chunk indices 7--9 (gripper\_norm values 0.53,
+    0.00, 0.99). The block escapes during the transient open at index~8,
+    displacing 8~mm in $x$ and 12~mm in $y$ before the gripper re-closes on air.
+    The latch fix (Section \ref{sec:latch_fix}) prevents this by enforcing closed state once
+    gripper\_norm~$> 0.5$ until a clear placement signal (gripper\_norm~$< 0.2$).}
+    \label{fig:hysteresis}
+\end{figure}
+
+
+The VLM planner will be integrated with the manipulation policy, generating valid primitive sequences for all tested goal configurations. End-to-end collaborative evaluation remains ongoing.
+
+% ======================================================
+
+% \section{Critical Reflection}
+
+% \subsection{Evaluation of Research Progress}
+% % Progress table
+% % Comparison against plan
+
+% \subsection{Methodological Reflection}
+% % What worked
+% % What did not
+
+% \subsection{Lessons Learned}
+% % Action representation importance
+% % Dataset design lessons
+
+% \subsection{Changes from the Original Plan}
+% % Evolution since ESG
+\section{Critical Reflection}
+
+\subsection{Evaluation of Research Progress}
+
+
+\begin{table*}[h]
+\centering
+\caption{Summary of major development stages}
+\label{tab:development_summary}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{4cm} p{2cm} p{8cm}}
+\hline
+\textbf{Development Stage} & \textbf{Status} & \textbf{Outcome} \\
+\hline
+
+Simulation Environment &
+Completed &
+Developed a custom Baxter robot environment in MuJoCo with dual-camera observations, coloured manipulation objects, and configurable task setups. \\
+
+Demonstration Collection &
+Completed &
+Implemented a Damped Least Squares inverse kinematics pipeline for autonomous demonstration generation and LeRobot dataset creation. \\
+
+VLA Adaptation &
+Completed &
+Fine-tuned the $\pi$0.5 Vision-Language-Action model using LoRA and evaluated multiple policy checkpoints. \\
+
+Action Representation &
+Completed &
+Redesigned the policy from velocity-control to position-control actions based on experimental evaluation. \\
+
+Vision-Language Planner &
+Completed &
+Developed a Gemma-3-12B planner to generate manipulation task sequences from current and goal workspace images. \\
+
+Planner--Policy Integration &
+In Progress &
+Integrated the Vision-Language planner with the fine-tuned $\pi$0.5 policy for sequential task execution. \\
+
+End-to-End System Evaluation &
+In Progress &
+Evaluating complete planner-to-policy execution, collaborative task success, and robustness prior to physical robot deployment. \\
+
+Physical Robot Deployment &
+In Progress &
+Preparing the framework for fine-tuning and evaluation on the Robot DE NIRO platform. \\
+
+\hline
+\end{tabular}
+\end{table*}
+
+
+The current status of the project is summarised in Table \ref{tab:development_summary}. The majority of the core technical objectives proposed during the Early Stage Gateway have been completed, including simulation environment development, demonstration collection, VLA adaptation and VLM planner development. The remaining work is primarily focused on planner--policy integration, physical robot deployment, and validation of the complete human-robot collaboration workflow.
+
+Overall progress is aligned with the original project timeline. While several unexpected technical challenges were encountered during development, these challenges resulted in valuable insights regarding action-space design, train--inference consistency, and the practical adaptation of foundation-scale robotic policies to novel embodiments.
+
+\begin{figure*}[h]
+\centering
+\begin{ganttchart}[
+    x unit=1.1cm,
+    y unit title=0.7cm,
+    y unit chart=0.7cm,
+    title height=1,
+    title label font=\bfseries,
+    bar/.style={fill=blue!40},
+    bar height=0.6,
+    group height=0.7,
+    vgrid,
+    hgrid
+]{1}{8}
+
+\gantttitle{2026}{8} \\
+\gantttitle{July}{4}
+\gantttitle{August}{4} \\
+\gantttitlelist{1,...,8}{1} \\
+
+\ganttbar{Policy refinement}{1}{3} \\
+\ganttbar{Additional data collection}{1}{4} \\
+\ganttbar{Planner--policy evaluation}{3}{5} \\
+\ganttbar{Physical robot deployment}{4}{7} \\
+\ganttbar{End-to-end validation}{6}{8} \\
+\ganttbar{Dissertation writing}{1}{8} \\
+
+\end{ganttchart}
+\caption{Planned activities for the remaining project period (~8 weeks)}
+\label{fig:gantt_future}
+\end{figure*}
+
+
+\subsection{Methodological Reflection}
+
+One of the most successful methodological decisions was the adoption of a simulation-first development strategy. Initially, simulation was viewed primarily as a convenient environment for collecting demonstrations and training policies. However, the project revealed that simulation also served as an effective debugging platform, allowing numerous train--inference mismatches to be identified and resolved before deployment on physical hardware.
+
+The iterative development process also proved valuable. Rather than treating policy training as a one-time procedure, each generation of checkpoints was analysed in detail and used to guide subsequent modifications. The VLM planner's evaluation was conducted separately, at an earlier stage of the project. This approach enabled systematic investigation of failure modes.
+
+A limitation of the methodology is that evaluation has primarily been conducted within simulation. Although this was appropriate for rapid experimentation, the true effectiveness of the approach can only be fully assessed following deployment on the physical Robot DE NIRO platform. Consequently, the reported results demonstrate the feasibility of the proposed approach within simulation, while validation on the physical Robot DE NIRO platform remains future work.
+
+\subsection{Lessons Learned}
+
+The most important lesson from this project is that successful adaptation of Vision-Language-Action models depends more on system design than optimisation alone. Checkpoint comparisons showed that improvements in manipulation performance were driven primarily by changes to the action representation and improvements in train--inference consistency rather than by longer training or lower loss values.
+
+Finally, decomposing the task into six reusable manipulation primitives simplified both policy learning and planner integration. This modular design enables more complex collaborative behaviours to be achieved through task sequencing rather than retraining the manipulation policy.
+
+\begin{table*}[h]
+\centering
+\caption{Project risk register}
+\label{tab:risk_register}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{2.5cm} p{3.8cm} p{0.2cm} p{0.2cm} p{1.6cm} p{3.5cm} p{3.5cm}}
+\hline
+\textbf{Risk} &
+\textbf{Description} &
+\textbf{L} &
+\textbf{I} &
+\textbf{Risk} &
+\textbf{Mitigation} &
+\textbf{Contingency} \\
+ &
+ &
+ &
+ &
+\textbf{Level} &
+ &
+\\
+\hline
+
+Manipulation Reliability &
+Current policy does not achieve consistent grasping across all manipulation tasks. &
+4 &
+4 &
+16 (High) &
+Refine demonstration data, improve grasp trajectories, and continue checkpoint evaluation. &
+Collect additional demonstrations for underperforming tasks and retrain the policy. \\
+
+Training Data Coverage &
+Limited demonstrations in some workspace regions may reduce policy generalisation, particularly near workspace boundaries. &
+3 &
+4 &
+12 (High) &
+Collect demonstrations across a wider range of object positions and balance the dataset. &
+Generate targeted demonstrations for poorly performing workspace configurations. \\
+
+Sim-to-Real Transfer &
+Differences in sensing, dynamics, and calibration between simulation and Robot DE NIRO may reduce physical performance. &
+3 &
+5 &
+15 (High) &
+Validate the complete pipeline in simulation and use transferable position-control actions. &
+Fine-tune the policy using demonstrations collected on the physical robot. \\
+
+Physical Deployment Timeline &
+Limited time remains for hardware validation before dissertation submission. &
+3 &
+4 &
+12 (High) &
+Complete software validation and end-to-end testing in simulation before deployment. &
+Prioritise evaluation of the core objectives and document remaining experiments as future work. \\
+
+End-to-End Evaluation &
+Integrated planner-policy testing may reveal failure modes not observed during component-level evaluation. &
+2 &
+4 &
+8 (Medium) &
+Evaluate the complete planner-policy pipeline across multiple goal configurations. &
+Isolate planner and manipulation components to identify and resolve failures independently. \\
+
+\hline
+\end{tabular}
+
+\footnotesize
+L = Likelihood (1--5), I = Impact (1--5), Risk Level = L $\times$ I.
+\end{table*}
+
+
+% ======================================================
+
+% \section{Future Work, Plans and Risks}
+
+% \subsection{Remaining Technical Work}
+% % End-to-end validation
+% % Replanning
+% % Physical robot deployment
+
+% \subsection{Updated Project Plan}
+% % Timeline
+% % Gantt chart
+
+% \subsection{Risk Assessment}
+% % Technical risks
+% % Mitigation strategies
+
+% \subsection{Dissertation Completion Plan}
+% % Writing schedule
+% % Evaluation schedule
+\section{Future Work, Plans and Risks}
+
+\subsection{Remaining Work}
+Refer to the Gantt chart shown in Fig. \ref{fig:gantt_future}, for an overview of the remaining work and the associated timelines.
+With the core system architecture complete, the remaining work focuses on evaluation and refinement rather than implementation of new components.
+
+The first priority is improving manipulation robustness through additional policy refinement. In particular, further experiments will investigate the influence of workspace geometry on manipulation performance, as the current evaluation suggests lower success rates for objects located near the workspace boundaries, such as the green block. Future work will systematically evaluate the effect of workspace geometry on manipulation performance by varying object positions independently of object identity, allowing the influence of workspace location to be isolated from training data imbalance.
+
+The second priority is end-to-end evaluation of the integrated planner--policy framework, including scenarios involving human intervention and dynamic replanning.
+
+Finally, the framework will be deployed on the Robot DE NIRO platform to evaluate transfer from simulation to physical hardware.
+
+% \begin{figure*}[h]
+% \centering
+% \begin{ganttchart}[
+%     x unit=1.1cm,
+%     y unit title=0.7cm,
+%     y unit chart=0.7cm,
+%     title height=1,
+%     title label font=\bfseries,
+%     bar/.style={fill=blue!40},
+%     bar height=0.6,
+%     group height=0.7,
+%     vgrid,
+%     hgrid
+% ]{1}{8}
+
+% \gantttitle{2026}{8} \\
+% \gantttitle{July}{4}
+% \gantttitle{August}{4} \\
+% \gantttitlelist{1,...,8}{1} \\
+
+% \ganttbar{Policy refinement}{1}{3} \\
+% \ganttbar{Additional data collection}{1}{4} \\
+% \ganttbar{Planner--policy evaluation}{3}{5} \\
+% \ganttbar{Physical robot deployment}{4}{7} \\
+% \ganttbar{End-to-end validation}{6}{8} \\
+% \ganttbar{Dissertation writing}{1}{8} \\
+
+% \end{ganttchart}
+% \caption{Planned activities for the remaining project period.}
+% \label{fig:gantt_future}
+% \end{figure*}
+
+
+% The core infrastructure required for the proposed human-robot collaboration framework has been successfully developed. The remaining work therefore focuses primarily on evaluation, refinement, and deployment rather than the implementation of entirely new system components.
+
+% The first priority is the continued refinement of the position-control manipulation policy. Although the current policy demonstrates meaningful task understanding, grasp attempts, and object transport behaviour, manipulation success remains limited by grasp precision and placement accuracy. Additional experiments will therefore investigate modifications to the demonstration dataset, controller parameters, and training configuration to improve robustness.
+
+% The second priority is the completion of end-to-end evaluation of the integrated planner--policy architecture. While the Vision-Language planner has been validated independently and integrated with the manipulation policy, comprehensive evaluation of the complete workflow remains ongoing. These experiments will assess whether the system can reliably transform an arbitrary initial block configuration into a user-specified goal arrangement through a sequence of generated manipulation primitives.
+
+% Finally, the project will transition towards physical deployment on the Robot De NIRo platform. The existing simulation environment, inverse kinematics framework, and data collection pipeline were intentionally designed to facilitate transfer to the physical robot. Initial deployment activities will therefore focus on demonstration collection and validation of policy execution on real hardware.
+
+\subsection{Human-Robot Collaboration Evaluation}
+
+The final dissertation will evaluate the complete planner--policy framework on collaborative rearrangement tasks. Given an initial and goal workspace configuration, the Vision--Language planner will generate a sequence of manipulation primitives which will then be executed by the fine-tuned $\pi$0.5 policy. Performance will be measured using the collaborative task success metric defined in Section \ref{sec:collab_metric}.
+
+Additional experiments will evaluate dynamic replanning by introducing human modifications to the workspace during execution. The planner will be required to detect the updated scene, generate a revised task sequence, and continue progressing towards the desired goal configuration.
+
+Thus, the remaining project timeline is structured around four major milestones:
+
+\begin{enumerate}
+\item Refinement and evaluation of the position-control manipulation policy.
+\item End-to-end validation of the planner--policy architecture.
+\item Deployment and testing on the physical Robot DE NIRO platform.
+\item Dissertation writing, analysis, and final submission.
+
+\end{enumerate}
+The final dissertation will present the complete hierarchical framework, evaluate adaptation of the $\pi$0.5 model to a novel robot embodiment, and assess the effectiveness of integrating Vision--Language planning with Vision--Language--Action manipulation.
+
+\subsection{Risk Assessment}
+Refer Table \ref{tab:risk_register} for the potential risks and their workarounds.
+% \begin{table*}[h]
+% \centering
+% \caption{Project risk register}
+% \label{tab:risk_register}
+% \renewcommand{\arraystretch}{1.2}
+% \begin{tabular}{p{2.5cm} p{3.8cm} p{0.2cm} p{0.2cm} p{1.6cm} p{3.5cm} p{3.5cm}}
+% \hline
+% \textbf{Risk} &
+% \textbf{Description} &
+% \textbf{L} &
+% \textbf{I} &
+% \textbf{Risk} &
+% \textbf{Mitigation} &
+% \textbf{Contingency} \\
+%  &
+%  &
+%  &
+%  &
+% \textbf{Level} &
+%  &
+% \\
+% \hline
+
+% Manipulation Reliability &
+% Current policy does not achieve consistent grasping across all manipulation tasks. &
+% 4 &
+% 4 &
+% 16 (High) &
+% Refine demonstration data, improve grasp trajectories, and continue checkpoint evaluation. &
+% Collect additional demonstrations for underperforming tasks and retrain the policy. \\
+
+% Training Data Coverage &
+% Limited demonstrations in some workspace regions may reduce policy generalisation, particularly near workspace boundaries. &
+% 3 &
+% 4 &
+% 12 (High) &
+% Collect demonstrations across a wider range of object positions and balance the dataset. &
+% Generate targeted demonstrations for poorly performing workspace configurations. \\
+
+% Sim-to-Real Transfer &
+% Differences in sensing, dynamics, and calibration between simulation and Robot DE NIRO may reduce physical performance. &
+% 3 &
+% 5 &
+% 15 (High) &
+% Validate the complete pipeline in simulation and use transferable position-control actions. &
+% Fine-tune the policy using demonstrations collected on the physical robot. \\
+
+% Physical Deployment Timeline &
+% Limited time remains for hardware validation before dissertation submission. &
+% 3 &
+% 4 &
+% 12 (High) &
+% Complete software validation and end-to-end testing in simulation before deployment. &
+% Prioritise evaluation of the core objectives and document remaining experiments as future work. \\
+
+% End-to-End Evaluation &
+% Integrated planner-policy testing may reveal failure modes not observed during component-level evaluation. &
+% 2 &
+% 4 &
+% 8 (Medium) &
+% Evaluate the complete planner-policy pipeline across multiple goal configurations. &
+% Isolate planner and manipulation components to identify and resolve failures independently. \\
+
+% \hline
+% \end{tabular}
+
+% \footnotesize
+% L = Likelihood (1--5), I = Impact (1--5), Risk Level = L $\times$ I.
+% \end{table*}
+
+
+% ======================================================
+
+\section{Conclusion}
+
+This report has presented the progress made towards developing a hierarchical human–robot collaboration framework that combines high-level Vision–Language planning with low-level Vision–Language–Action manipulation. It first motivated the need for efficient adaptation of foundation-scale VLA models to novel robotic embodiments before describing the overall system architecture, demonstration collection pipeline, and adaptation of the $\pi$0.5 model to a Baxter robot in a custom MuJoCo environment.
+
+The report then described the development of the fine-tuning and inference framework, including the transition from velocity-control to position-control actions, the implementation of a Vision–Language planner for task sequencing, and the evaluation methodology used to assess policy performance. Experimental results and checkpoint comparisons were presented to analyse the impact of key engineering decisions, identify train–inference mismatches, and investigate the principal failure modes affecting manipulation performance.
+
+Finally, the report reflected on the progress achieved since the Early Stage Gateway, discussed the remaining technical challenges, and outlined the plan for completing planner–policy integration, physical robot deployment, and end-to-end evaluation. Together, these developments establish the foundation for the final stage of the project, which will focus on validating the complete hierarchical framework for collaborative manipulation on a novel robotic platform.
+
+\section{Acknowledgement of AI Usage}
+This report was developed with the assistance of AI tools (e.g., ChatGPT, Claude) for paraphrasing and latex code editing. All ideas, implementations, and critical decisions presented in this work are my own. The use of AI tools was limited to enhancing productivity and readability, and all outputs were carefully reviewed and validated.
+
+
+\clearpage
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+
+\end{document}
