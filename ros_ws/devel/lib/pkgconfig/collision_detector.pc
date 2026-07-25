@@ -1,0 +1,8 @@
+prefix=/home/petar/ros_ws/devel
+
+Name: collision_detector
+Description: Description of collision_detector
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/petar/ros_ws/devel/lib 
+Requires: 

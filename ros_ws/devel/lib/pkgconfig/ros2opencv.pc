@@ -1,0 +1,8 @@
+prefix=/home/petar/ros_ws/devel
+
+Name: ros2opencv
+Description: Description of ros2opencv
+Version: 0.3.0
+Cflags: 
+Libs: -L/home/petar/ros_ws/devel/lib 
+Requires: roscpp rospy std_msgs sensor_msgs cv_bridge image_transport openni_camera

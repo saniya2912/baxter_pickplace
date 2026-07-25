@@ -1,0 +1,25 @@
+(cl:defpackage k2_client-msg
+  (:use )
+  (:export
+   "<APPEARANCE>"
+   "APPEARANCE"
+   "<JOINTPOSITIONANDSTATE>"
+   "JOINTPOSITIONANDSTATE"
+   "<EXPRESSIONS>"
+   "EXPRESSIONS"
+   "<BODYARRAY>"
+   "BODYARRAY"
+   "<JOINTORIENTATIONANDTYPE>"
+   "JOINTORIENTATIONANDTYPE"
+   "<AUDIO>"
+   "AUDIO"
+   "<FACE>"
+   "FACE"
+   "<LEAN>"
+   "LEAN"
+   "<BODY>"
+   "BODY"
+   "<ACTIVITIES>"
+   "ACTIVITIES"
+  ))
+

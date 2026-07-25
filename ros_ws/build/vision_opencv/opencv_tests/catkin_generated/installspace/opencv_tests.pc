@@ -1,0 +1,8 @@
+prefix=/home/petar/ros_ws/install
+
+Name: opencv_tests
+Description: Description of opencv_tests
+Version: 1.11.16
+Cflags: 
+Libs: -L/home/petar/ros_ws/install/lib 
+Requires: 

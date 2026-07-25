@@ -1,0 +1,292 @@
+#!/usr/bin/env python
+
+"""
+Title: Collaborative Table Moving
+Based on: Baxter RSDK Joint Torque Example (Spring Torque Demo)
+By: Arash Tavakoli and Roni Seputra
+Date: April 22, 2017
+Demo Prepared for: BBC 
+"""
+
+import math
+import rospy
+import argparse
+import numpy as np
+from numpy import pi 
+import baxter_interface
+from baxter_interface import CHECK_VERSION
+from std_msgs.msg import Float32MultiArray
+
+from dynamic_reconfigure.server import (
+    Server,
+)
+from std_msgs.msg import (
+    Empty,
+)
+
+from baxter_examples.cfg import (
+    JointSpringsExampleConfig,
+)
+
+
+class JointSprings(object):
+    """
+    Virtual Joint Springs class for torque example.
+
+    @param reconfig_server: dynamic reconfigure server
+
+    JointSprings class contains methods for the joint torque example allowing
+    moving the limb to a neutral location, entering torque mode, and attaching
+    virtual springs.
+    """
+    def __init__(self):
+        #self._dyn = reconfig_server
+
+        # control parameters
+        self._rate = 1000.0  # Hz
+        self._missed_cmds = 20.0  # Missed cycles before triggering timeout
+
+        # create our limb instance
+        self._limb_l = baxter_interface.Limb("left")
+        self._limb_r = baxter_interface.Limb("right")
+
+        # initialize parameters manually (not updating using the rqt_reconfigure tool)
+        # highest stiffness
+        self._springs = {"left_s0": 30.0, "left_s1": 30.0, "left_e0": 15.0, "left_e1": 15.0, "left_w0": 9.0, "left_w1": 4.0, "left_w2": 4.0, 
+            "right_s0": 30.0, "right_s1": 30.0, "right_e0": 15.0, "right_e1": 15.0, "right_w0": 9.0, "right_w1": 4.0, "right_w2": 4.0}
+        self._damping = {"left_s0": 10, "left_s1": 7.5, "left_e0": 7.5, "left_e1": 5.0, "left_w0": 1.5, "left_w1": 1.5, "left_w2": 1.0, 
+            "right_s0": 10, "right_s1": 7.5, "right_e0": 7.5, "right_e1": 5.0, "right_w0": 1.5, "right_w1": 1.5, "right_w2": 1.0}
+        self._start_angles = dict()
+        
+        # moderate stiffness
+        #self._springs = {"left_s0": 10.0, "left_s1": 15.0, "left_e0": 5.0, "left_e1": 5.0, "left_w0": 3.0, "left_w1": 2.0, "left_w2": 1.5,
+        #    "right_s0": 10.0, "right_s1": 15.0, "right_e0": 5.0, "right_e1": 5.0, "right_w0": 3.0, "right_w1": 2.0, "right_w2": 1.5}
+        #self._damping = {"left_s0": 4.5, "left_s1": 3.0, "left_e0": 3.0, "left_e1": 2.0, "left_w0": 0.7, "left_w1": 0.7, "left_w2": 0.4,
+        #    "right_s0": 4.5, "right_s1": 3.0, "right_e0": 3.0, "right_e1": 2.0, "right_w0": 0.7, "right_w1": 0.7, "right_w2": 0.4}
+        
+
+        # Positions for holding the table from the back with arms wide open
+        self.neutral_pose_l = {"left_s0": -0.9, "left_s1": -0.86, "left_e0": 0.11, "left_e1": 2.06, "left_w0": 0, "left_w1": -1.59, "left_w2": -1.57}
+        self.neutral_pose_r = {"right_s0": 0.9, "right_s1": -0.86, "right_e0": 0.11, "right_e1": 2.06, "right_w0": 0, "right_w1": -1.59, "right_w2": 1.57}
+        
+        # Positions for holding the table from the back of the table with arms close to each other
+        #self.neutral_pose_l = {'left_e0': -0.23124760377372613, 'left_e1':2.1291653335849543, 'left_s0':-0.9035146840645087, 'left_s1':-0.6454224165027879, 
+        #'left_w0':-0.27113110425874687, 'left_w1':-1.5707963267946636, 'left_w2':-1.4020584401272682}
+        #self.neutral_pose_r = {'right_e0': 0.23124760377372613, 'right_e1':2.1291653335849543, 'right_s0':0.9035146840645087, 'right_s1':-0.6454224165027879, 
+        #'right_w0':0.27113110425874687, 'right_w1':-1.5707963267946636, 'right_w2':1.4020584401272682}
+
+        # Positions for holding the table from the sides 
+        #self.neutral_pose_l = {'left_e0':0.016106798272796843, 'left_e1':0.6929758209272356, 'left_s0':-0.4094806239558822, 'left_s1':-0.52635441262262177, 
+        #'left_w0':-1.520174960794445, 'left_w1':1.994024528084025, 'left_w2':0.36355344672884304}
+        #self.neutral_pose_r = {'right_e0':-0.016106798272796843, 'right_e1':0.6929758209272356, 'right_s0':0.4094806239558822, 'right_s1':-0.52635441262262177, 
+        #'right_w0':1.520174960794445, 'right_w1':1.994024528084025, 'right_w2':-0.36355344672884304}
+
+        # create cuff disable publisher
+        cuff_ns_r = 'robot/limb/right/suppress_cuff_interaction'
+        self._pub_cuff_disable_r = rospy.Publisher(cuff_ns_r, Empty, queue_size=1)
+        cuff_ns_l = 'robot/limb/left/suppress_cuff_interaction'
+        self._pub_cuff_disable_l = rospy.Publisher(cuff_ns_l, Empty, queue_size=1)
+
+        self.pub_wheelchair = rospy.Publisher("base_control_sig", Float32MultiArray, queue_size=1)
+
+        # verify robot is enabled
+        print("Getting robot state... ")
+        self._rs = baxter_interface.RobotEnable(CHECK_VERSION)
+        self._init_state = self._rs.state().enabled
+        print("Enabling robot... ")
+        self._rs.enable()
+        print("Running. Ctrl-c to quit")
+
+    """
+    def _update_parameters(self):
+        for joint in self._limb_l.joint_names():
+            self._springs[joint] = self._dyn.config[joint[-2:] +
+                                                    '_spring_stiffness']
+            self._damping[joint] = self._dyn.config[joint[-2:] +
+                                                    '_damping_coefficient']
+        for joint in self._limb_r.joint_names():
+            self._springs[joint] = self._dyn.config[joint[-2:] +
+                                                    '_spring_stiffness']
+            self._damping[joint] = self._dyn.config[joint[-2:] +
+                                                    '_damping_coefficient']
+    """
+
+    def _update_forces(self, counter):
+        """
+        Calculates the current angular difference between the start position
+        and the current joint positions applying the joint torque spring forces
+        as defined on the dynamic reconfigure server.
+        """
+        # get latest spring constants
+        #self._update_parameters()
+
+        # disable cuff interaction
+        self._pub_cuff_disable_r.publish()
+        self._pub_cuff_disable_l.publish()
+
+        # create our command dict
+        cmd_l = dict()
+        cmd_r = dict()
+        # record current angles/velocities
+        cur_pos_l = self._limb_l.joint_angles()
+        cur_vel_l = self._limb_l.joint_velocities()
+        cur_pos_r = self._limb_r.joint_angles()
+        cur_vel_r = self._limb_r.joint_velocities()
+        
+        # calculate current forces
+        # for the left arm
+        for joint in self._start_angles_l.keys():
+            # spring portion
+            cmd_l[joint] = self._springs[joint] * (self._start_angles_l[joint] - cur_pos_l[joint])
+            # damping portion
+            cmd_l[joint] -= self._damping[joint] * cur_vel_l[joint]
+        # for the right arm
+        for joint in self._start_angles_r.keys():
+            # spring portion
+            cmd_r[joint] = self._springs[joint] * (self._start_angles_r[joint] - cur_pos_r[joint])
+            # damping portion
+            cmd_r[joint] -= self._damping[joint] * cur_vel_r[joint]
+        
+        
+        # command new joint torques
+        self._limb_l.set_joint_torques(cmd_l)
+        self._limb_r.set_joint_torques(cmd_r)
+        
+        end_pose_l = self._limb_l.endpoint_pose()["position"]
+        end_pose_r = self._limb_r.endpoint_pose()["position"]
+        #print end_pose_l, end_pose_r
+        #end_pose = [end_pose.x, end_pose.y - self.y_offset]
+
+        # angle
+        #angle = math.atan2(end_pose[1], end_pose[0])
+        angle = math.atan2(end_pose_l[0] + end_pose_r[0], end_pose_l[1] + end_pose_r[1]) #(end_pose_l[0] - end_pose_r[0])
+
+        # velocity
+        #velocity = math.sqrt(end_pose[0]**2 + end_pose[1]**2)
+        #velocity -= self.velocity_offset
+        velocity = np.sign((end_pose_l[0] + end_pose_r[0])) * math.sqrt((end_pose_l[0] + end_pose_r[0])**2 + (end_pose_l[1] + end_pose_r[1])**2)   #(end_pose_l[0] + end_pose_r[0])/2
+        velocity -= self.velocity_offset
+
+        # velocity threshold 
+        if abs(velocity) < 0.05:
+            velocity = 0
+
+        # scale velocity and angular velocity to be suitable for mobile base control commands
+        velocity *= 100.
+        angle = angle * 180./pi - 90.
+        angle *= 3./5
+
+        if velocity < 0:
+            velocity = 1.8*velocity - 7.
+        elif velocity > 0:
+            velocity = 1.2*velocity + 7.
+
+        # if velocity is above 12, the robot is already moving,
+        # thus small amounts of angular velocity can affect the motion 
+        # dramatically; offset accordingly  
+        if np.absolute(velocity) < 12.:    
+            if angle < -1:
+                angle = angle - 10.
+            elif angle > 1:
+                angle = angle + 10.
+        else:
+            if angle < -1:
+                angle = angle + 3.
+            elif angle > 1:
+                angle = angle - 3.
+
+        print "velocity:", velocity, "angle:", angle
+        control_sig = Float32MultiArray()
+        control_sig.data = [velocity, angle] # [forward velocity, angular velocity]
+        if counter % 12 == 0:
+	    self.pub_wheelchair.publish(control_sig)
+
+    def move_to_neutral(self):
+        """
+        Moves the limb to neutral location.
+        """
+        self._limb_l.move_to_joint_positions(self.neutral_pose_l, timeout=15.0, threshold=0.004)
+        self._limb_r.move_to_joint_positions(self.neutral_pose_r, timeout=15.0, threshold=0.004)
+
+        self.neutral_end_effector_l = self._limb_l.endpoint_pose()["position"]
+        self.neutral_end_effector_r = self._limb_r.endpoint_pose()["position"]
+        #end_pose = self._limb.endpoint_pose()["position"]
+        #end_pose = [end_pose.x, end_pose.y - self.y_offset]
+        end_pose_l = self._limb_l.endpoint_pose()["position"]
+        end_pose_r = self._limb_r.endpoint_pose()["position"]
+        #self.velocity_offset = math.sqrt(end_pose[0]**2 + end_pose[1]**2)
+        self.velocity_offset = np.sign((end_pose_l[0] + end_pose_r[0])) * math.sqrt((end_pose_l[0] + end_pose_r[0])**2 + (end_pose_l[1] + end_pose_r[1])**2) # (end_pose_l[0] + end_pose_r[0])/2
+
+    def attach_springs(self):
+        """
+        Switches to joint torque mode and attached joint springs to current
+        joint positions.
+        """
+
+	counter = 0
+        # record initial joint angles
+        self._start_angles_l = self._limb_l.joint_angles()
+        self._start_angles_r = self._limb_r.joint_angles()
+
+        # set control rate
+        control_rate = rospy.Rate(self._rate)
+
+        # for safety purposes, set the control rate command timeout.
+        # if the specified number of command cycles are missed, the robot
+        # will timeout and disable
+        self._limb_l.set_command_timeout((1.0 / self._rate) * self._missed_cmds)
+        self._limb_r.set_command_timeout((1.0 / self._rate) * self._missed_cmds)
+
+        # loop at specified rate commanding new joint torques
+        while not rospy.is_shutdown():
+            if not self._rs.state().enabled:
+                rospy.logerr("Joint torque example failed to meet "
+                             "specified control rate timeout.")
+                break
+            self._update_forces(counter)
+            counter += 1
+            control_rate.sleep()
+
+    def clean_shutdown(self):
+        """
+        Switches out of joint torque mode to exit cleanly
+        """
+        print("\nShutting down...")
+        self._limb_r.exit_control_mode()
+        self._limb_l.exit_control_mode()
+        
+        if not self._init_state and self._rs.state().enabled:
+            print("Disabling robot...")
+            self._rs.disable()
+
+
+def main():
+    """ Collaborative Table Moving
+    Moves both limbs to a the table-holding pose configuration
+    and enters torque control mode, attaching virtual springs (Hooke's Law)
+    to each joint maintaining the start position.
+
+    After running this code, put the table inside the grippers and close the 
+    grippers using the commandline below: 
+    rosrun baxter_examples gripper_keyboard.py
+    c   left: calibrate
+    q   left: close
+    w   left: open
+    C   right: calibrate
+    Q   right: close
+    W   right: open
+    """
+    print("Initializing node... ")
+    rospy.init_node("collaborative_table_moving")
+    #dynamic_cfg_srv = Server(JointSpringsExampleConfig,
+    #                         lambda config, level: config)
+    js = JointSprings()
+    # register shutdown callback
+    rospy.on_shutdown(js.clean_shutdown)
+    # move to specified initial pose configuration
+    js.move_to_neutral()
+    js.attach_springs()
+
+
+if __name__ == "__main__":
+    main()

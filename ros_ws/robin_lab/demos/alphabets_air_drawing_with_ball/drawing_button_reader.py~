@@ -1,0 +1,44 @@
+from __future__ import print_function # Only Python 2.x
+import subprocess
+import sys
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import time
+import datetime
+import numpy as np
+import math
+import scipy.optimize
+import functools
+import serial
+from threading import Thread
+
+# ROS-related imports
+#import rospy
+#from geometry_msgs.msg import Pose  
+
+
+ser = serial.Serial('/dev/ttyUSB0',115200,timeout=1)
+last_received = "low"
+
+def receiving(ser): #Arache is stooopid
+    global last_received
+    line = "low"
+    buffer_string = ''
+    while True:
+        while ser.inWaiting() > 0:
+            line = ser.readline()
+        if line == "high":
+            print(line)
+        last_received = line
+
+thrd = Thread(target=receiving, args=(ser,)) 
+thrd.daemon = True
+thrd.start()
+
+# checking when the button is pressed 
+while True:
+    if ("high" in last_received):
+        print("Pressed.")
+
+    else:
+        print("NOT pressed.")

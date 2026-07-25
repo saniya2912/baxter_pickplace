@@ -1,0 +1,1000 @@
+  997  ./baxter.sh
+  998  ifconfig
+  999  rosrun baxter_tools enable_robot.py -e
+ 1000  rostopic pub /robot/sonar/head_sonar/set_sonars_enabled std_msgs/UInt16 0
+ 1001  rosrun baxter_tools enable_robot.py -e
+ 1002  rosrun baxter_examples joint_torque_springs.py -l right
+ 1003  cd ros_ws/
+ 1004  ./baxter.sh
+ 1005  rostopic list 
+ 1006  cat baxter.sh
+ 1007  head baxter.sh
+ 1008  cd ros_ws/
+ 1009  ls
+ 1010  cat baxter.sh
+ 1011  bash baxter.sh
+ 1012  exit
+ 1013  sudo add-apt-repository ppa:ethz-asl/backports
+ 1014  sudo add-apt-repository ppa:ethz-asl/drivers
+ 1015  sudo add-apt-repository ppa:ethz-asl/ros
+ 1016  sudo apt-get update
+ 1017  sudo apt-get install ros-ROS_DISTRO-kinect2
+ 1018  sudo apt-get install ros-indigo-kinect2
+ 1019  sudo apt-get install ros-indigo-kinect2-bridge
+ 1020  sudo apt-get install ros-indigo-libfreenect2-dev
+ 1021  sudo apt-get install libopencv-de libpcl-1.7-all-dev ros-indigo-roscpp, ros-ROS_DISTRO-rostime, ros-indigo-std-msgs, ros-indigo-sensor-msgs, ros-indigo-message-filters, ros-indigo-cv-bridge, ros-indigo-image-transport, ros-indigo-compressed-image-transport, ros-indigo-compressed-depth-image-transport
+ 1022  sudo add-apt-repository ppa:ethz-asl/backports
+ 1023  sudo add-apt-repository ppa:ethz-asl/drivers
+ 1024  sudo add-apt-repository ppa:ethz-asl/ros
+ 1025  sudo apt-get update
+ 1026  sudo apt-get install ros-indigo-kinect2
+ 1027  sudo apt-get install ros-indigo-kinect2-bridge
+ 1028  ./baxter.sh
+ 1029  head baxter.shrostopic pub /robot/sonar/head_sonar/set_sonars_enabled std_msgs/UInt16 0
+ 1030  rostopic pub /robot/sonar/head_sonar/set_sonars_enabled std_msgs/UInt16 0
+ 1031  cd ros_ws/
+ 1032  bash baxter.sh
+ 1033  grep -rn kinect
+ 1034  roslaunch kinect2_bridge kinect2_bridge.launch
+ 1035  cd openni2_launch/
+ 1036  locate openni2_launch
+ 1037  locate openni2.launch
+ 1038  cd 
+ 1039  cd src/openni2_launch/launch/
+ 1040  roslaunch openni2.launch 
+ 1041  roslaunch openni2_launch  openni2.launch 
+ 1042  roslaunch openni2-launch  openni2.launch 
+ 1043  roslaunch openni2_launch  openni2.launch 
+ 1044  locate openni2.launch
+ 1045  sudo apt-get install ros-indigo-openni2-launch
+ 1046  locate freenect.launch
+ 1047  roslaunch freenect_launch freenect.launch
+ 1048  cd
+ 1049  cd ros_ws/src/
+ 1050  git clone https://github.com/ros-drivers/openni2_launch.git
+ 1051  ls
+ 1052  cd ..
+ 1053  catkin_make
+ 1054  ls src
+ 1055  mkdir broken
+ 1056  mv src/iai_kinect2/ broken
+ 1057  catkin_make
+ 1058  cd src/openni2_launch/launch/
+ 1059  ls
+ 1060  roslaunch openni2.launch 
+ 1061  cd ../..
+ 1062  git clone https://github.com/ros-drivers/rgbd_launch.git
+ 1063  cd ..
+ 1064  catkin_make
+ 1065  cd src/openni2_launch/launch/
+ 1066  roslaunch openni2.launch 
+ 1067  source /opt/ros/indigo/setup.bash 
+ 1068  roslaunch openni2.launch 
+ 1069  source ~/ros_ws/devel/setup.bash 
+ 1070  roslaunch openni2.launch 
+ 1071  cd
+ 1072  cd ros_ws/src/
+ 1073  git clone https://github.com/ros-perception/image_pipeline.git
+ 1074  cd ..
+ 1075  catkin_make
+ 1076  ls src/
+ 1077  trash src/image_pipeline/
+ 1078  catkin_make
+ 1079  sudo apt-get install ros-indigo-image-pipeline 
+ 1080  sudo apt-get update
+ 1081  sudo apt-get install ros-indigo-image-pipeline 
+ 1082  exit
+ 1083  cd robin_lab/demos/buzz_wire/
+ 1084  ls
+ 1085  nano infinite_buzz_wire.py
+ 1086  sudo apt-get update
+ 1087  sudo apt-get update
+ 1088  sudo apt-get install mpg123
+ 1089  mpg123
+ 1090  mpg12
+ 1091  mpg321
+ 1092  sudo apt-get install mpg321
+ 1093  mpg321
+ 1094  sudo apt-get install mpg321
+ 1095  sudo apt-get update
+ 1096  sudo apt-get install mpg321
+ 1097  mpg321
+ 1098  cd ros_ws/
+ 1099  ./baxter.sh
+ 1100  rostopic list
+ 1101  cat baxter.sh
+ 1102  head baxter.sh
+ 1103  AAA
+ 1104  rostopic echo /touch
+ 1105  cd robin_lab/demos/buzz_wire/
+ 1106  ls
+ 1107  ls \################################################## 
+ 1108  cat \################################################## 
+ 1109  ls
+ 1110  rostopic pub /robot/sonar/head_sonar/set_sonars_enabled std_msgs/UInt16 0
+ 1111  rosrun baxter_tools enable_robot.py -e
+ 1112  python infinite_buzz_wire.py 
+ 1113  cd robin_lab/demos/buzz_wire/
+ 1114  python infinite_buzz_wire.py 
+ 1115  python infinite_buzz_wire.py --new-pose
+ 1116  python infinite_buzz_wire.py reset
+ 1117  nano .bashrc
+ 1118  bash
+ 1119  nano .bashrc
+ 1120  ifconfig 
+ 1121  nano .bashrc
+ 1122  bash
+ 1123  cd ros_ws/
+ 1124  ls
+ 1125  ./baxter.sh
+ 1126  ./baxter.sh
+ 1127  source ~/.bashrc
+ 1128  nano .bashrc
+ 1129  bash
+ 1130   .bashrc
+ 1131  bash
+ 1132  cd ros_ws/
+ 1133  ls
+ 1134  ./baxter.sh
+ 1135  ./baxter.sh
+ 1136  nano .bashrc
+ 1137  bash
+ 1138  ls
+ 1139  rostop echo /touch
+ 1140  rostopic echo /touch
+ 1141  ls
+ 1142  cd ..
+ 1143  ls
+ 1144  cd ros_ws/
+ 1145  ls
+ 1146  cd robin_lab/
+ 1147  ls
+ 1148  cd demos/
+ 1149  ls
+ 1150  cd buzz_wire/
+ 1151  ls
+ 1152  python infinite_buzz_wire.py
+ 1153  ls
+ 1154  python infinite_buzz_wire.py reset
+ 1155  ls
+ 1156  vim infinite_buzz_wire.py
+ 1157  ls
+ 1158  python infinite_buzz_wire.py reset
+ 1159  vim infinite_buzz_wire.py
+ 1160  ls
+ 1161  vim infinite_buzz_wire.py
+ 1162  python infinite_buzz_wire.py
+ 1163  vim infinite_buzz_wire.py
+ 1164  ls
+ 1165  python infinite_buzz_wire.py
+ 1166  ls
+ 1167  vim infinite_buzz_wire.py
+ 1168  vim infinite_buzz_wire.py reset
+ 1169  python infinite_buzz_wire.py reset
+ 1170  vim infinite_buzz_wire.py reset
+ 1171  ls
+ 1172  python infinite_buzz_wire.py
+ 1173  vim infinite_buzz_wire.py
+ 1174  ls
+ 1175  python infinite_buzz_wire.py
+ 1176  ls
+ 1177  vim infinite_buzz_wire.py
+ 1178  python infinite_buzz_wire.py reset
+ 1179  ls
+ 1180  python infinite_buzz_wire.py reset
+ 1181  vim infinite_buzz_wire.py
+ 1182  python infinite_buzz_wire.py reset
+ 1183  vim infinite_buzz_wire.py
+ 1184  ls
+ 1185  python infinite_buzz_wire.py
+ 1186  python infinite_buzz_wire.py reset
+ 1187  python infinite_buzz_wire.py
+ 1188  ls
+ 1189  cd ros_ws/`
+ 1190  cd ros_ws/
+ 1191  ls
+ 1192  ./baxter.sh
+ 1193  sudo shutdown -h now
+ 1194  cd ros_ws/
+ 1195  ./baxter.sh
+ 1196  roscore
+ 1197  ls
+ 1198  roscore
+ 1199  rosversion -d
+ 1200  sudo apt-get install ros-indigo-rviz
+ 1201  apt-get -f install
+ 1202  sudo apt-get -f install
+ 1203  sudo apt-get install ros-indigo-rviz
+ 1204  sudo apt-get -f install
+ 1205  libusb-1.0-0
+ 1206  sudo apt-get install libusb-1.0-0
+ 1207  sudo apt-get install -f 
+ 1208  sudo apt-get update
+ 1209  sudo apt-get dist-upgrade
+ 1210  sudo dpkg -r --force-depends libusb-1.0-0
+ 1211  sudo aptitude install -f
+ 1212  sudo apt-get install -f
+ 1213  sudo apt-get install libusb-1.0-0
+ 1214  sudo apt-get update
+ 1215  sudo apt-get -f
+ 1216  sudo apt-get install -f
+ 1217  ls
+ 1218  dpkg -l libusb*
+ 1219  sudo apt-get install
+ 1220  sudo apt-get install libusb-1.0-0
+ 1221  cd 
+ 1222  cd ..
+ 1223  cd /var
+ 1224  cd cache
+ 1225  cd apt
+ 1226  cd archives
+ 1227  rm libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb 
+ 1228  ls
+ 1229  vim libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb 
+ 1230  rm libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb 
+ 1231  ls
+ 1232  sudo rm libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb
+ 1233  s
+ 1234  ls
+ 1235  sudo apt-get install -f 
+ 1236  ls
+ 1237  rm libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb 
+ 1238  ls
+ 1239  sudo rm libusb-1.0-0_2%3a1.0.20-1ppa1~trusty1_amd64.deb 
+ 1240  s
+ 1241  ls
+ 1242  sudo apt-get install -f 
+ 1243  sudo apt-get install -f 
+ 1244  sudo apt-get install -f
+ 1245  ls
+ 1246  sudo apt-get remove libusb-1.0-0-dev
+ 1247  sudo apt-get remove libusb-1.0-0
+ 1248  sudo apt-get install libusb-1.0-0
+ 1249  sudo apt-get autoclean
+ 1250  sudo apt-get install libusb-1.0-0
+ 1251  cd /usr/share/doc/libusb-1.0-0
+ 1252  ls
+ 1253  vim changelog.Debian.gz 
+ 1254  ls
+ 1255  sudo apt-get remove libusb-1.0-dev
+ 1256  sudo apt-get remove libusb-1.0-0-dev 
+ 1257  sudo apt-get remove -f libusb-1.0-0-dev 
+ 1258  sudo apt-get install 
+ 1259  sudo apt-get install -f
+ 1260  ls
+ 1261  cd ..
+ 1262  ls
+ 1263  sudo apt-get install -f
+ 1264  sudo apt-get install -f 
+ 1265  sudo apt-get remove libusb-1.0-0
+ 1266  sudo apt-get install -f 
+ 1267  ls
+ 1268  sudo apt-get install -f 
+ 1269  cd /var/cache/apt/archives/
+ 1270  ls
+ 1271  cd /usr/share/doc
+ 1272  ls
+ 1273  sudo apt-get install -f 
+ 1274  cd /usr/share/doc/libusb-1.0-0/
+ 1275  ls
+ 1276  sudo apt-get install -f 
+ 1277  sudo apt-get update
+ 1278  sudo apt-get dist-upgrade
+ 1279  apt-get purge
+ 1280  sudo apt-get purge
+ 1281  sudo apt-get purge libusb-1.0-0-dev
+ 1282  sudo apt-get clean
+ 1283  sudo apt-get autoclean
+ 1284  sudo apt-get -u dist-upgrade
+ 1285  sudo apt-get install -f rviz
+ 1286  sudo apt-get -f purge libdc1394-22
+ 1287  sudo apt-get -f purge cups
+ 1288  sudo apt-get install -f
+ 1289  sudo apt-get -u dist-upgrade
+ 1290  cd 
+ 1291  ls
+ 1292  history > history.txt
+ 1293  ls
+ 1294  gedit history.txt
+ 1295  cd ros_ws/
+ 1296  catkin_make
+ 1297  ls
+ 1298  cd src
+ 1299  ls
+ 1300  git clone https://github.com/ros-visualization/python_qt_binding.git
+ 1301  ls
+ 1302  catkin_make
+ 1303  cd ..
+ 1304  catkin_make
+ 1305  ls
+ 1306  source devel/setup.bash
+ 1307  catkin_make
+ 1308  sudo apt-get install python-qt4
+ 1309  sudo apt-get install python-qt5
+ 1310  catkin_make
+ 1311  ls
+ 1312  cd src
+ 1313  ls
+ 1314  cd python_qt_binding/
+ 1315  git status
+ 1316  git branch -a
+ 1317  git checkout groovy-devel
+ 1318  git checkout /remotes/origin/groovy-devel
+ 1319  git checkout remotes/origin/groovy-devel
+ 1320  ls
+ 1321  cd ..
+ 1322  catkin_make
+ 1323  locate python-pyqt4
+ 1324  locate pyqt
+ 1325  sudo apt-get remove pyqt4
+ 1326  sudo apt-get remove python-pyqt4
+ 1327  sudo apt-get remove python-pyqt
+ 1328  catkin_make
+ 1329  locate pyqt
+ 1330  cd 
+ 1331  cd Desktop
+ 1332  ls
+ 1333  ./install_opencv2_ubuntu.s
+ 1334  ./install_opencv2_ubuntu.sh
+ 1335  chmod -x install_opencv2_ubuntu.sh 
+ 1336  ./install_opencv2_ubuntu.sh
+ 1337  sudo ./install_opencv2_ubuntu.sh
+ 1338  sudo sh ./install_opencv2_ubuntu.sh
+ 1339  locate site-packages
+ 1340  cd /usr/local/lib/python2.7
+ 1341  ls
+ 1342  cd site-packages/
+ 1343  ls
+ 1344  ls -a
+ 1345  cd ..
+ 1346  cd python3.4
+ 1347  ls
+ 1348  cd ..
+ 1349  ls
+ 1350  cd python2.7
+ 1351  ls
+ 1352  cd site-packages/
+ 1353  ls
+ 1354  vim cv.py
+ 1355  sudo vim cv.py
+ 1356  ls
+ 1357  python cv.py
+ 1358  cd ..
+ 1359  vim cv.py
+ 1360  sudo vim cv.py
+ 1361  ls
+ 1362  cd ..
+ 1363  ls
+ 1364  sudo vim cv.py
+ 1365  ls
+ 1366  cd python2.7
+ 1367  ls
+ 1368  cd site-packages/
+ 1369  ls
+ 1370  vim cv.py
+ 1371  sudo apt-get install ros-indigo-rviz
+ 1372  rosrun rviz rviz
+ 1373  ls
+ 1374  cd 
+ 1375  ls
+ 1376  /opt/ros/indigo/
+ 1377  cd /opt/ros/indigo/
+ 1378  sudo apt-get install ros-indigo-rviz
+ 1379  ls
+ 1380  cd 
+ 1381  ls
+ 1382  cd ros_ws/
+ 1383  ls
+ 1384  cd src
+ 1385  ls
+ 1386  cd ..
+ 1387  ls
+ 1388  cd ..
+ 1389  ls
+ 1390  mv rviz ros_ws/src/rviz
+ 1391  ls
+ 1392  cd ros_ws/
+ 1393  ls
+ 1394  source devel/setup.bash
+ 1395  cd src
+ 1396  ls
+ 1397  cd ...
+ 1398  cd ..
+ 1399  catkin_make
+ 1400  sudo apt-get install python-qt4-dev
+ 1401  cd ~/Desktop
+ 1402  ls
+ 1403  cd PyQt4_gpl_x11-4.12.1/
+ 1404  s
+ 1405  ls
+ 1406  cd sip
+ 1407  ls
+ 1408  cd ..
+ 1409  ./configure.py
+ 1410  sudo ./configure.py
+ 1411  python ./configure.py
+ 1412  ls
+ 1413  make
+ 1414  make install
+ 1415  sudo make install
+ 1416  cd 
+ 1417  ls
+ 1418  mv ~/Desktop/PyQt4_gpl_x11-4.12.1 ~/ros_ws/src/PyQt4
+ 1419  ls
+ 1420  cd ros_ws/
+ 1421  ls
+ 1422  catkin_make
+ 1423  vim /home/petar/ros_ws/src/python_qt_binding/cmake/sip_configure.py
+ 1424  cd ..
+ 1425  cd Desktop/
+ 1426  ls
+ 1427  cd sip-4.19.7/
+ 1428  ls
+ 1429  python configure.py
+ 1430  make
+ 1431  make install
+ 1432  sudo make install
+ 1433  echo $PATH
+ 1434  cd /usr/bin/sip 
+ 1435  cd /usr/bin/
+ 1436  ls
+ 1437  cd sip
+ 1438  ls
+ 1439  cd .
+ 1440  cd ..
+ 1441  cd 
+ 1442  cd Desktop
+ 1443  ls
+ 1444  cd ..
+ 1445  ls
+ 1446  cd ros_ws/
+ 1447  lw
+ 1448  ls
+ 1449  cd src
+ 1450  ls
+ 1451  mv PyQt4 ~/Desktop/PyQt4
+ 1452  ls
+ 1453  cd 
+ 1454  cd Desktop
+ 1455  ls
+ 1456  cd PyQt4/
+ 1457  ls
+ 1458  python configure-ng.py
+ 1459  sudo python configure-ng.py
+ 1460  make install
+ 1461  ls
+ 1462  python configure-ng.py --sip /usr/bin/sip --sip-incdir /usr/include/python2.7/sip.h
+ 1463  python configure-ng.py --sip /usr/bin/sip --sip-incdir /usr/include/python2.7
+ 1464  sudo python configure-ng.py --sip /usr/bin/sip --sip-incdir /usr/include/python2.7
+ 1465  make install
+ 1466  sudo make install
+ 1467  ls
+ 1468  cd ros_ws/
+ 1469  ls
+ 1470  catkin_make
+ 1471  ls
+ 1472  catkin_make
+ 1473  cd src
+ 1474  ls
+ 1475  cd ls
+ 1476  ls
+ 1477  ls
+ 1478  cd Desktop/
+ 1479  ls
+ 1480  cd PyQt4_gpl_x11-4.12.1/
+ 1481  ls
+ 1482  make
+ 1483  python configure-ng.py
+ 1484  sudo python configure-ng.py
+ 1485  sudo python configure.py
+ 1486  locate sip.SIP_VERSION_STR
+ 1487  python
+ 1488  locate sip
+ 1489  /usr/share/sip/PyQt4
+ 1490  cd 
+ 1491  cd /usr/share/sip/PyQt4
+ 1492  ls
+ 1493  cd ..
+ 1494  ls
+ 1495  rm -r -f PyQt4/
+ 1496  sudo rm -r -f PyQt4/
+ 1497  ls
+ 1498  sudo apt-get install python-pyqt4
+ 1499  sudo apt-get install python-qt4
+ 1500  sudo apt-get remove python-qt4
+ 1501  sudo apt-get install python-qt4
+ 1502  ls
+ 1503  cd ..
+ 1504  cd
+ 1505  cd ros_ws/
+ 1506  catkin_make
+ 1507  rostopic list
+ 1508  ls
+ 1509  cd src
+ 1510  ls
+ 1511  cd rbx1/
+ 1512  ls
+ 1513  cd rbx1_vision/
+ 1514  ls
+ 1515  cd launch
+ 1516  ls
+ 1517  cd
+ 1518  ls
+ 1519  cd ros_ws/
+ 1520  ls
+ 1521  source devel/setup.bash
+ 1522  ls
+ 1523  cd src
+ 1524  ls
+ 1525  cd rbx1/
+ 1526  ls
+ 1527  cd rbx1_vision/
+ 1528  ls
+ 1529  cd laucnh
+ 1530  cd launch
+ 1531  ls
+ 1532  roslaunch rbx1 face_tracker.launch
+ 1533  roslaunch rbx1_vision face_tracker.launch
+ 1534  cd ..
+ 1535  catkin_make
+ 1536  roslaunch rbx1_vision face_tracker.launch
+ 1537  python
+ 1538  roscd rbx1
+ 1539  ls
+ 1540  cd..
+ 1541  cd ..
+ 1542  ls
+ 1543  cd rbx1_vision
+ 1544  ls
+ 1545  roslaunch rbx1_vision face_tracker.launch
+ 1546  cd nodes
+ 1547  vim face_tracker.py
+ 1548  python
+ 1549  sudo apt-get install opencv
+ 1550  sudo add-apt-repository ppa:gijzelaar/cuda
+ 1551  sudo add-apt-repository ppa:gijzelaar/opencv2.3
+ 1552  sudo apt-get update
+ 1553  sudo apt-get install libcv-dev
+ 1554  roslaunch rbx1_vision face_tracker.launch
+ 1555  python
+ 1556  sudo apt-get opencv
+ 1557  sudo apt-get install opencv
+ 1558  pip install opencv==
+ 1559  pip install opencv-python==
+ 1560  sudo add-apt-repository ppa:gijzelaar/opencv2
+ 1561  apt-get update
+ 1562  sudo apt-get update
+ 1563  sudo apt-get install libopencv-dev
+ 1564  sudo apt-get remove libopencv-dev
+ 1565  ls
+ 1566  vim face_tracker.py
+ 1567  roslaunch rbx1_vision face_tracker.launch
+ 1568  ls
+ 1569  roslaunch rbx1_vision face_tracker.launch
+ 1570  cd ..
+ 1571  catkin_make
+ 1572  roslaunch rbx1_vision face_tracker.launch
+ 1573  ls
+ 1574  roscd rbx1_vision
+ 1575  ls
+ 1576  cd nodes
+ 1577  ls
+ 1578  cd ..
+ 1579  ls
+ 1580  cd src
+ 1581  ls
+ 1582  cd rbx1_vision/
+ 1583  ls
+ 1584  roslaunch rbx1_vision face_tracker.launch
+ 1585  ls
+ 1586  cd /opt/ros
+ 1587  ls
+ 1588  cd indigo/
+ 1589  ls
+ 1590  cd share
+ 1591  ls
+ 1592  cd
+ 1593  ls
+ 1594  cd ros_ws
+ 1595  ls
+ 1596  cd src
+ 1597  ls
+ 1598  cd rbx1/
+ 1599  ls
+ 1600  cd ..
+ 1601  ls
+ 1602  catkin_make
+ 1603  ls
+ 1604  cd src
+ 1605  ls
+ 1606  cd image_pipeline/
+ 1607  ls
+ 1608  cd ..
+ 1609  ls
+ 1610  git clone https://github.com/ros-perception/vision_opencv.git 
+ 1611  cd vision_opencv/
+ 1612  ls
+ 1613  git status
+ 1614  git branch -a
+ 1615  git checkout remotes/origin/indigo
+ 1616  ls
+ 1617  cd ..
+ 1618  catkin_make
+ 1619  locate PyQT
+ 1620  locate pyqt
+ 1621  pip uninstall pyqt4
+ 1622  cd /usr/lib/python2.7/dist-packages/PyQt4/
+ 1623  ls
+ 1624  cd ..
+ 1625  ls
+ 1626  cd pyqt4
+ 1627  cd /usr/lib/python2.7/dist-packages/PyQt4/
+ 1628  ls
+ 1629  locate pyqt
+ 1630  cd ..
+ 1631  ls
+ 1632  cd 
+ 1633  ls
+ 1634  cd ros_ws
+ 1635  catkin_make
+ 1636  sudo apt-get install python-qt4
+ 1637  locate python-qt4
+ 1638  apt-cache search pyqt
+ 1639  sudo apt-get install ros-indigo-python-qt-binding 
+ 1640  catkin_make
+ 1641  locate QtWidgets/QtWidgetsmod.sip
+ 1642  locate QtWidget
+ 1643  locate QtWidgets/QtWidgetsmod
+ 1644  locate QtWidgets/QtWidgetsmod.sip
+ 1645  ls
+ 1646  catkin_Make
+ 1647  catkin_make
+ 1648  cd /opt/ros/indigo/share/
+ 1649  python-qt4
+ 1650  cd /opt/ros/indigo/share/
+ 1651  sudo apt-get install python-qt4
+ 1652  locate python-qt4
+ 1653  sudo apt-get remvoe python-qt4
+ 1654  sudo apt-get remove python-qt4
+ 1655  sudo apt-get install ros-indigo rqt
+ 1656  sudo apt-get install python-qt4
+ 1657  sudo apt-get install python_qt_binding
+ 1658  sudo apt-get install ros-indigo-python_qt_binding
+ 1659  cd 
+ 1660  ls
+ 1661  cd Desktop/
+ 1662  ls
+ 1663  cd PyQt4_gpl_x11-4.12.1/
+ 1664  ls
+ 1665  python configure.py
+ 1666  sudo apt-get install sip
+ 1667  cd ..
+ 1668  cd sip-4.19.7/
+ 1669  ls
+ 1670  make
+ 1671  python configure.py
+ 1672  make
+ 1673  make install
+ 1674  sudo make install
+ 1675  cd ..
+ 1676  cd PyQt4_gpl_x11-4.12.1/
+ 1677  ls
+ 1678  python configure.py
+ 1679  cd ..
+ 1680  ls
+ 1681  cd ros_ws/
+ 1682  ls
+ 1683  catkin_make
+ 1684  sudo apt-get install python-qt4-dev
+ 1685  ls
+ 1686  catkin_make
+ 1687  sudo apt-get remove python-qt4-dev
+ 1688  sudo apt-get install python-qt4-dev
+ 1689  ls
+ 1690  catkin_Make
+ 1691  catkin_make
+ 1692  ls
+ 1693  cd 
+ 1694  cd Desktop/
+ 1695  ls
+ 1696  cd PyQt4_gpl_x11-4.12.1/
+ 1697  ls
+ 1698  python configure.pyy
+ 1699  python configure.py
+ 1700  make
+ 1701  make install
+ 1702  sudo make install
+ 1703  cd 
+ 1704  cd ros_ws/
+ 1705  catkin_make
+ 1706  ls
+ 1707  cd src
+ 1708  ls
+ 1709  mv rviz ~/rviz
+ 1710  cd ..
+ 1711  catkin_make
+ 1712  ls
+ 1713  /opt/ros/indigo/
+ 1714  cd /opt/ros/indigo/
+ 1715  ls
+ 1716  soruce setup.bash
+ 1717  source setup.bash
+ 1718  ls
+ 1719  cd share
+ 1720  ls
+ 1721  cd kinect2_bridge
+ 1722  ls
+ 1723  cd launch
+ 1724  ls
+ 1725  roslaunch kinect2_bridge kinect2_bridge.launch
+ 1726  rostopic list
+ 1727  ls
+ 1728  cd ros_ws
+ 1729  ls
+ 1730  cd src
+ 1731  ls
+ 1732  roslaunch openni_launch openni.launch
+ 1733  ls
+ 1734  sudo apt-get install ros-indigo-freenect-stack
+ 1735  pwd
+ 1736  ls
+ 1737  cd openni
+ 1738  cd openni_camera
+ 1739  ls
+ 1740  cd ..
+ 1741  ls
+ 1742  cd openni2_launch/
+ 1743  ls
+ 1744  cd launch
+ 1745  ls
+ 1746  roslaunch openni2_launch depth.launch
+ 1747  ls
+ 1748  cd includes/
+ 1749  ls
+ 1750  roslaunch openni2_launch device.launch
+ 1751  cd
+ 1752  ls
+ 1753  cd ros_ws/src
+ 1754  ls
+ 1755  mv openni2_launch ~/Fabian
+ 1756  roslaunch openni_launch openni.launch
+ 1757  lsusb
+ 1758  git clone https://github.com/ros-drivers/freenect_stack
+ 1759  ls
+ 1760  cd freenect_stack/
+ 1761  ls
+ 1762  cd freenect_launch
+ 1763  ls
+ 1764  cd launch
+ 1765  ls
+ 1766  roslaunch freenect_launch freenect.launch
+ 1767  ls
+ 1768  cd Fabian
+ 1769  ls
+ 1770  cd ..
+ 1771  cd ros_ws/
+ 1772  ls
+ 1773  cd src
+ 1774  ls
+ 1775  cd ..
+ 1776  catkin_make
+ 1777  source devel/setup.bash
+ 1778  ls
+ 1779  cd src
+ 1780  ls
+ 1781  roslaunch rbx1_vision face_detector.launch 
+ 1782  rostopic list
+ 1783  rostopic list
+ 1784  ls
+ 1785  rostopic list
+ 1786  ls
+ 1787  cd ros_ws/
+ 1788  ls
+ 1789  cd src
+ 1790  ls
+ 1791  cd /opt/ros
+ 1792  ls
+ 1793  cd indigo/
+ 1794  ls
+ 1795  cd share
+ 1796  ls
+ 1797  cd kinect2_bridge
+ 1798  ls
+ 1799  cd launch
+ 1800  ls
+ 1801  roslaunch kinect2_bridge kinect2_bridge.launch 
+ 1802  source /opt/ros/indigo/setup.bash
+ 1803  roslaunch kinect2_bridge kinect2_bridge.launch 
+ 1804  cd .
+ 1805  ls
+ 1806  roslaunch kinect2_bridge kinect2_bridge.launch
+ 1807  rostopic list
+ 1808  rosrun rviz rviz
+ 1809  uname -a
+ 1810  cd /usr
+ 1811  ls
+ 1812  cd NX
+ 1813  ls
+ 1814  git clone https://gitlab.com/robot-intelligence-lab/fezzik-project
+ 1815  cd fezzik-project/
+ 1816  ls
+ 1817  ./baxter.sh 
+ 1818  catkin_make
+ 1819  ls
+ 1820  ./baxter.sh 
+ 1821  rostopic list
+ 1822  roscore
+ 1823  cd fezzik-project/
+ 1824  ./baxter.sh 
+ 1825  rqt
+ 1826  sudo apt-get install ros-indigo-rqt ros-indigo-rqt-common-plugins
+ 1827  sudo apt-get install ros-indigo-rqt-robot-plugins
+ 1828  sudo apt-get install ros-indigo-rqt ros-indigo-rqt-common-plugins
+ 1829  apt-get update
+ 1830  sudo apt-get update
+ 1831  rosversion -d
+ 1832  sudo apt-get install ros-indigo-rqt ros-indigo-rqt-common-plugins
+ 1833  sudo apt-get update
+ 1834  sudo apt-get install ros-indigo-rqt ros-indigo-rqt-common-plugins
+ 1835  ping 192.168.0.60
+ 1836  ping 192.168.0.61
+ 1837  ls
+ 1838  cd fezzik-project/
+ 1839  ls
+ 1840  sudo ls
+ 1841  cd /home/petar/Desktop/
+ 1842  LS -LA
+ 1843  LS -la
+ 1844  ls -la
+ 1845  cd /media/petar/
+ 1846  ls -la
+ 1847  mc
+ 1848  cd 96daabfc-fbc5-4437-97a4-bcccc8ed5495/
+ 1849  ls -la
+ 1850  cd ~/Desktop/wiiboard/wiiboard-master
+ 1851  python ./wiiboard.py
+ 1852  python ./final_smartscale_classTest_COP.py 
+ 1853  pip install --upgrade six
+ 1854  python ./final_smartscale_classTest_COP.py 
+ 1855  pip install --upgrade pip
+ 1856  python ./final_smartscale_classTest_COP.py 
+ 1857  cd ~/Desktop/wiiboard/wiiboard-master
+ 1858  python ./final_smartscale_classTest_COP.py 
+ 1859  ping 192.168.0.115
+ 1860  ssh petar@192.168.0.60
+ 1861  ssh petar@192.168.0.60
+ 1862  ssh petar@192.168.0.60
+ 1863  ssh petar@192.168.0.60
+ 1864  ls
+ 1865  cd fezzik-project/
+ 1866  ls
+ 1867  ./baxter.sh 
+ 1868  rviz
+ 1869  sudo apt-get install rviz 
+ 1870  sudo apt-get update
+ 1871  sudo apt-get install rviz 
+ 1872  sudo apt-get update
+ 1873  rviz
+ 1874  sudo apt-get install ros-indigo-rviz
+ 1875  ros version
+ 1876  ros
+ 1877  ssh petar@192.168.0.60
+ 1878  history
+ 1879  history | grep eva
+ 1880  locate eva
+ 1881  locate eva_
+ 1882  sudo updatedb
+ 1883  locate eva_
+ 1884  mc
+ 1885  ls 
+ 1886  exit
+ 1887  ./baxter.sh
+ 1888  ls
+ 1889  cd src/baxter_examples/
+ 1890  ls -la
+ 1891  cd scripts/
+ 1892  ls -la
+ 1893  ./head_wobbler.py 
+ 1894  ./gripper_keyboard.py 
+ 1895  ls -la
+ 1896  rosrun baxter_examples joint_trajectory_file_playback.py -f r1
+ 1897  rosrun baxter_examples joint_trajectory_file_playback.py -f r2
+ 1898  rosrun baxter_examples joint_trajectory_file_playback.py -f r4
+ 1899  rosrun baxter_examples joint_trajectory_file_playback.py -f r5
+ 1900  rosrun baxter_examples joint_trajectory_file_playback.py -f r8
+ 1901  history
+ 1902  ls -la
+ 1903  locate baxter.sh
+ 1904  cd ros_ws/
+ 1905  ls -la
+ 1906  ifcofnig
+ 1907  ifconfig
+ 1908  ./baxter.sh
+ 1909  rosrun baxter_examples joint_torque_springs.py -l left
+ 1910  history | grep record
+ 1911  ls -la
+ 1912  cd src/
+ 1913  ls -la
+ 1914  cd baxter_examples/
+ 1915  ls -la
+ 1916  cd scripts/
+ 1917  ls -la
+ 1918  ./joint_velocity_puppet.py 
+ 1919  ./joint_velocity_puppet.py -l left
+ 1920  ./joint_velocity_puppet.py -l right
+ 1921  ls -la
+ 1922  rosrun baxter_examples joint_recorder.py -f r1
+ 1923  locate action_server
+ 1924  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1925  rosrun baxter_tools enable_robot.py -e
+ 1926  history | grep untuck
+ 1927  history | grep tuck
+ 1928  locate tuck
+ 1929  rosrun baxter_examples joint_recorder.py -f r2
+ 1930  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1931  rosrun baxter_examples joint_recorder.py -f r3
+ 1932  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1933  rosrun baxter_examples joint_recorder.py -f r3
+ 1934  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1935  rosrun baxter_examples joint_recorder.py -f r3
+ 1936  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1937  rosrun baxter_examples joint_recorder.py -f r4
+ 1938  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1939  rosrun baxter_examples joint_recorder.py -f r5
+ 1940  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1941  rosrun baxter_examples joint_recorder.py -f r7
+ 1942  rosrun baxter_examples joint_recorder.py -f r8
+ 1943  rosrun baxter_interface joint_trajectory_action_server.py 
+ 1944  rostopic list
+ 1945  history
+ 1946  history | grep enable
+ 1947  rosrun baxter_tools enable_robot.py -e
+ 1948  history | grep baxter
+ 1949  history | grep face
+ 1950  history | grep mouth
+ 1951  history | grep torq
+ 1952  rosrun baxter_examples joint_torque_springs.py -l right
+ 1953  cd src/baxter_examples/ls -la
+ 1954  ls -la
+ 1955  cd src/baxter_examples/scripts/
+ 1956  ls -la
+ 1957  ./gripper_cuff_control.py 
+ 1958  ifconfig
+ 1959  ping 192.168.0.99
+ 1960  nano ./baxter.sh
+ 1961  ping 192.168.0.99
+ 1962  ./baxter.sh
+ 1963  ./baxter.sh
+ 1964  ping 192.168.2.2
+ 1965  cat /var/log/syslog
+ 1966  ping 192.168.2.1
+ 1967  ping 192.168.2.100
+ 1968  ping 192.168.2.101
+ 1969  ping 192.168.2.1
+ 1970  mc
+ 1971  ls -la
+ 1972  cat ./baxter.sh
+ 1973  env
+ 1974  mcedit ./baxter.sh
+ 1975  less ./baxter.sh
+ 1976  ping 192.168.2.1
+ 1977  ifconfig /all
+ 1978  ifconfig
+ 1979  ping 192.168.2.2
+ 1980  sudo updatedb
+ 1981  ping 192.168.2.1
+ 1982  ping 192.168.2.2
+ 1983  ping 192.168.2.3
+ 1984  ping 192.168.0.99
+ 1985  ifconfig
+ 1986  ping 192.168.0.99
+ 1987  ./baxter.sh
+ 1988  ifconfig
+ 1989  ping 192.168.2.2
+ 1990  ping 192.168.2.1
+ 1991  ifconfig
+ 1992  ./baxter.sh
+ 1993  ifconfig
+ 1994  ./baxter.sh
+ 1995  ls -la
+ 1996  history > hist_2024_02_14.txt

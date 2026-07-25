@@ -1,0 +1,67 @@
+0. Start
+rosrun baxter_tools tuck_arms.py -u
+rosrun baxter_examples xdisplay_image.py -f /home/petar/ros_ws/robin_lab/de_niro.png
+roslaunch baxter_safety safety.launch
+rosrun rviz rviz
+rosrun baxter_tools camera_control.py -c right_hand_camera
+rosrun baxter_tools camera_control.py -o head_camera -r 1280x800
+rosrun baxter_tools camera_control.py -o left_hand_camera -r 1280x800
+rosrun image_view image_view image:=/cameras/left_hand_camera/image
+rosrun image_view image_view image:=/cameras/head_camera/image
+
+rosrun image_view image_view image:=/kinect2/hd/image_color/
+
+1. Cube stacking
+distant small grippers
+python ~/ros_ws/robin_lab/follow_direct_joints.py
+
+2. Key
+close small grippers
+python ~/ros_ws/robin_lab/follow_direct_joints.py
+
+3. Connect 4
+rosrun connect_four connect_vision.py -l right
+rosrun connect_four connect_game.py -l left -c red
+
+4. Soft springs
+rosrun baxter_examples joint_torque_springs.py -l left
+rosrun baxter_examples joint_torque_springs.py -l right
+rosrun rqt_reconfigure rqt_reconfigure
+
+5. Block stacking
+python ~/ros_ws/robin_lab/fabio/scripts/follow_direct_joints.py
+roslaunch baxter_examples gripper_joystick.launch joystick:=xbox
+
+-----------------------------------
+
+Selfie
+rosrun sound_play soundplay_node.py
+python ~/ros_ws/robin_lab/selfie2.py
+
+
+End
+rosrun baxter_tools tuck_arms.py -t
+
+If required
+enable:
+rosrun baxter_tools enable_robot.py -e
+rosrun baxter_tools enable_robot.py -d
+
+rosrun baxter_examples joint_velocity_puppet.py -l right
+rosrun baxter_examples gripper_keyboard.py
+rosrun baxter_tools camera_control.py -c head_camera
+rosrun baxter_tools camera_control.py -o head_camera -r 960x600
+rosrun baxter_tools camera_control.py -o left_hand_camera -r 960x600
+rosrun baxter_tools camera_control.py -o right_hand_camera -r 960x600
+
+
+-----------------------------
+
+KINECT
+
+roslaunch kinect2_bridge kinect2_bridge.launch 
+rosrun kinect2_viewer kinect2_viewer
+
+
+rosrun image_view image_view image:=/kinect2/hd/image_color/compressed
+

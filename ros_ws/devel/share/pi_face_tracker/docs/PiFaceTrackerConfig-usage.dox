@@ -1,0 +1,7 @@
+\subsubsection usage Usage
+\verbatim
+<node name="pi_face_tracker" pkg="pi_face_tracker" type="pi_face_tracker">
+  <param name="enable" type="bool" value="True" />
+</node>
+\endverbatim
+

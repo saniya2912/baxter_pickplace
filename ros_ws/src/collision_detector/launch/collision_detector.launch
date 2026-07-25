@@ -1,0 +1,11 @@
+<launch>
+    <node name="hokuyo0" pkg="urg_node" type="urg_node">
+        <param name="ip_address" type="string" value="192.168.2.11" />
+        <param name="frame_id" type="string" value="base" />
+        <remap from="scan" to="scan" />
+    </node>
+
+    <node name="Obs_Detect" pkg="collision_detector" type="Obs_Detect.py" output="screen">
+    </node>
+
+</launch>

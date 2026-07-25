@@ -1,0 +1,33 @@
+%% ALPHABETS DEMO using BALL-VISUAL-TRACKING:
+# On the secondary computer (petar@deniro-pc), run the following:
+$ python objtrack.py # runs the object tracker controlled with button reader for starting to store a segment 
+$ python keyboard_controller.py # for controlling when to send the drawing objective ("f") and when to restart ("r")
+
+# On the main computer (petar@petar-pc-2):
+$ python air_drawing.py # receives an array of pixels coords, scales, and controls Baxter
+ 
+***************************** In case of issues **********************************   
+- Check which USB port is used for Arduino-driven button:
+$ cat /dev/tty[TAB]
+If serial-port name is different from the one in the objtrack.py, change name in the script. 
+
+- If serial-port access is not permitted by the machine, you'd need to add the user to the dialout group for using the 
+serial ports: 
+$ sudo adduser second_user dialout
+
+- If things still don't work, you may need to install arduino:
+$ sudo apt-get install arduino
+
+- If NETWORK IPs have changed and can't connect to Baxter, you can check all IP addresses on the network with NMAP:  
+$ sudo apt-get install nmap 
+$ nmap -sP 192.168.1.*
+$ nmap -sP 192.168.2.*
+**********************************************************************************
+
+
+
+
+
+
+
+

@@ -1,5 +1,6 @@
 # Data files
 *.hdf5
+*.bag
 
 # Videos
 *.mp4

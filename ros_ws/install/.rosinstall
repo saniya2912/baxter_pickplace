@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/petar/ros_ws/install/setup.sh

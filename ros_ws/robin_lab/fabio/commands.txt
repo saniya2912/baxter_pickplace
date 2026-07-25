@@ -1,0 +1,34 @@
+
+rosrun gazebo_ros spawn_model -file `pwd`/target.sdf -sdf -x 0.15 -y -1.5 -z 1 -model target
+
+
+rosservice call /gazebo/set_model_state '{model_state: { model_name: target, pose: { position: { x: 0.15, y: -1.2, z: 1.5 }, orientation: {x: 0, y: 0, z: 0, w: 0 } }, twist: { linear: {x: 0.0 , y: 0 ,z: 0 } , angular: { x: 0 , y: 0 , z: 0 } }, reference_frame: world } }'
+
+rosservice call gazebo/get_model_properties '{model_name: target}'
+
+rosservice call gazebo/delete_model '{model_name: target}'
+
+
+
+rosservice call gazebo/pause_physics
+rosservice call gazebo/unpause_physics
+
+
+
+
+
+
+
+rosservice call gazebo/apply_body_wrench '{body_name: "target::targedt" , wrench: { torque: { x: -0.01, y: 0 , z: 0 } }, start_time: 10000000000, duration: 1000000000 }'
+
+
+rosservice call gazebo/get_world_properties
+rosservice call gazebo/get_model_properties '{model_name: baxter}'
+
+
+
+links   "base0" "base1" "base2" "base3" "base4" "base" "collision_head_link_1" "collision_head_link_2" "torso" "head" "dummyhead1" "head_camera" "screen" "display" "left_arm_mount" "left_upper_shoulder" "left_lower_shoulder" "left_upper_elbow" "left_lower_elbow" "left_upper_forearm" "left_arm_itb" "left_lower_forearm" "left_wrist" "left_hand" "left_gripper_base" "left_gripper" "left_hand_accelerometer" "left_hand_camera" "left_hand_camera_axis" "left_hand_range" "left_upper_forearm_visual" "left_upper_elbow_visual" "left_torso_itb" "pedestal" "right_arm_mount" "right_upper_shoulder" "right_lower_shoulder" "right_upper_elbow" "right_lower_elbow" "right_upper_forearm" "right_arm_itb" "right_lower_forearm" "right_wrist" "right_hand" "right_gripper_base" "right_gripper" "right_hand_accelerometer" "right_hand_camera" "right_hand_camera_axis" "right_hand_range" "right_upper_forearm_visual" "right_upper_elbow_visual" "right_torso_itb" "sonar_ring" 
+
+
+rosservice call gazebo/get_model_state '{model_name: baxter::left_upper_shoulder}'
+

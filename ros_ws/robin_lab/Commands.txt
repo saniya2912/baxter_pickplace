@@ -1,0 +1,108 @@
+Commands for DE NIRO
+-------------------
+
+cd ros_ws/
+./baxter.sh
+
+rosrun baxter_tools enable_robot.py -e
+rosrun baxter_tools enable_robot.py -d
+
+rosrun baxter_tools tuck_arms.py -u
+rosrun baxter_tools tuck_arms.py -t
+
+Examples:
+
+http://sdk.rethinkrobotics.com/wiki/Foundations#Robot_Foundations
+
+Display
+rosrun baxter_examples xdisplay_image.py -f /home/petar/ros_ws/robin_lab/de_niro.png
+
+Puppet
+rosrun baxter_examples joint_velocity_puppet.py -l right
+
+Gripper Control
+rosrun baxter_examples gripper_keyboard.py
+c 	left: calibrate
+q 	left: close
+w 	left: open
+
+Joint Torque Control
+rosrun baxter_examples joint_torque_springs.py -l right
+rosrun rqt_reconfigure rqt_reconfigure
+
+Display an image to Baxter's head
+rosrun baxter_examples xdisplay_image.py --file=`rospack find baxter_examples`/share/images/baxterworking.png
+Max screen resolution is 1024x600.
+
+Camera Control
+1280x800 @14hz
+960x600  @20hz
+640x400  @25hz (default)
+384x240  @20hz
+320x200  @20hz
+
+rosrun baxter_tools camera_control.py -l
+rosrun baxter_tools camera_control.py -c left_hand_camera
+rosrun baxter_tools camera_control.py -o head_camera -r 960x600
+rosrun baxter_tools camera_control.py -o right_hand_camera -r 960x600
+
+rosrun image_view image_view image:=/cameras/right_hand_camera/image
+rosrun image_view image_view image:=/cameras/left_hand_camera/image
+rosrun image_view image_view image:=/cameras/head_camera/image
+
+Head Movement
+rosrun baxter_examples head_wobbler.py
+
+Joint Trajectory Playback
+rosrun baxter_examples joint_recorder.py -f filename
+rosrun baxter_interface joint_trajectory_action_server.py
+rosrun baxter_examples joint_trajectory_file_playback.py -f filename
+
+Joystick
+roslaunch baxter_examples gripper_joystick.launch joystick:=xbox
+
+rosparam set jonode/dev "/dev/input/js0" (the one in jstest-gtk app)
+rosrun joy joy_node
+rostopic echo joy (see messages)
+
+Relay camera to screen
+rosrun topic_tools relay /cameras/head_camera/image /robot/xdisplay
+
+DISABLE COLLISION AVOIDANCE
+/!\ use with caution
+rostopic pub /robot/limb/left/suppress_collision_avoidance std_msgs/Empty -r 10
+rostopic pub /robot/limb/right/suppress_collision_avoidance std_msgs/Empty -r 10
+
+SELFIE
+rosrun sound_play soundplay_node.py
+python selfie.py
+
+------------------------------
+
+SIMULATION
+
+cd ros_ws
+./baxter.sh sim
+
+roslaunch baxter_gazebo baxter_world.launch
+rosrun baxter_tools enable_robot.py -e
+
+---
+
+RVIZ
+
+rosrun rviz rviz
+add robotmodel
+global options fixed frame: map -> world
+
+---
+
+MODIFY FINGERS?
+does not work actually
+
+sudo gedit /opt/ros/indigo/share/baxter_description/urdf/left_end_effector.urdf.xacro
+extended_narrow -> standard_narrow
+
+disable sonar
+rostopic pub /robot/sonar/head_sonar/set_sonars_enabled std_msgs/UInt16 0
+

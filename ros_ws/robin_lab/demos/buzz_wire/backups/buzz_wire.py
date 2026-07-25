@@ -1,0 +1,188 @@
+#!/usr/bin/env python
+
+import rospy
+import baxter_interface
+import baxter_external_devices
+import ik_solver
+from baxter_interface import CHECK_VERSION
+from geometry_msgs.msg import Point, Quaternion
+import cPickle as pickle
+import cv2
+import cv_bridge
+from sensor_msgs.msg import Image
+import time
+import random
+
+def display(path):
+    img = cv2.imread(path)
+    msg = cv_bridge.CvBridge().cv2_to_imgmsg(img, encoding="bgr8")
+    pub = rospy.Publisher('/robot/xdisplay', Image, latch=True, queue_size=1)
+    pub.publish(msg)
+
+def move_to(limb, target_angles, wire_height, threshold=baxter_interface.settings.JOINT_ANGLE_TOLERANCE):
+	#print "end effector:", limb.endpoint_pose()["position"].z, "wire:", wire_height
+	def genf(joint, angle):
+		def joint_diff():
+			return abs(angle - limb._joint_angle[joint])
+		return joint_diff
+	diffs = [genf(j, a) for j, a in target_angles.items() if j in limb._joint_angle]
+
+	for step in xrange(100):
+		limb.set_joint_positions(target_angles)
+		#if abs(wire_height - limb.endpoint_pose()["position"].z) > 0.08:
+			#print "touched", wire_height, limb.endpoint_pose()["position"].z
+		#	return False
+		if all(diff() < threshold for diff in diffs): return True
+		#print [diff() < threshold for diff in diffs]
+		time.sleep(0.01)
+	print "TIMEOUT"
+	assert False
+
+def get_possible(prev_r, tried):
+	possibles = []
+	# up?
+	if prev_r < n_horizontal_ticks-1 and not prev_r+1 in tried: possibles.append(prev_r+1)
+	# down?
+	if prev_r > 0 and not prev_r-1 in tried: possibles.append(prev_r-1)
+	# stay?
+	if prev_r not in tried: possibles.append(prev_r)
+	return random.choice(possibles)
+
+rospy.init_node("buzz_wire")
+print("Getting robot state... ")
+rs = baxter_interface.RobotEnable(CHECK_VERSION)
+rs.enable()
+
+right_limb = baxter_interface.Limb('right')
+
+print right_limb.joint_angles()
+
+safe_initial_position = {'right_s0': -1.3874856226423566, 'right_s1': 0.3712233506682701,
+						 'right_w0': 0.8248981686853812, 'right_w1': -0.29107285450125725,
+						 'right_e0': 1.3882526130362995, 'right_e1': 2.25265078700973,
+						 'right_w2': 0.4210777262745461}
+
+right_initial_position = {'right_s0': -0.6, 'right_s1': 0.0,
+                          'right_w0': -0.0, 'right_w1': -0.0,
+                          'right_e0': 1.5, 'right_e1': 1.5,
+                          'right_w2': 1.5}
+
+safe_middle_position = {'right_s0': 0.19059711289476267, 'right_s1': 0.7600874803972225,
+						'right_w0': 0.6883738785635795, 'right_w1': -1.5688788508098068,
+						'right_e0': 1.214145793611305, 'right_e1': 2.0056798801601783,
+						'right_w2': 1.4396409694304608}
+
+
+# precision in degrees
+precision_02 = 0.003491
+precision_05 = 2.5 * precision_02
+precision_1 = 5 * precision_02
+precision_2 = 10 * precision_02
+precision_5 = 25 * precision_02
+precision = precision_2
+
+# right_limb.move_to_joint_positions(right_initial_position, timeout=5.0, threshold=precision)
+# pose = right_limb.endpoint_pose()
+# position = pose['position']
+# orientation = pose['orientation']
+position = Point(x=0.8147298010583702, y=-0.58726777914636, z=0.34311346201545906)
+orientation = Quaternion(x=0.7281019692147929, y=0.06868985662775609, z=0.6818691797130693, w=-0.01427052134385321)
+
+length = 0.8
+height = 0.4
+delta = 0.05
+n_horizontal_ticks = int(length / delta) + 1
+n_vertical_ticks = int(height / delta) + 1
+
+# create all the joint positions
+# all_joint_positions = [[[{}, {}] for r in xrange(n_vertical_ticks)] for c in xrange(n_horizontal_ticks)]
+# for c in xrange(n_horizontal_ticks):
+# 	for r in xrange(n_vertical_ticks) if c%2==0 else reversed(xrange(n_vertical_ticks)):
+# 		dy = c * delta
+# 		dz = r * delta - height / 2
+# 		for d in xrange(2): # depth
+# 			dx = d * 0.1
+# 			print dx, dy, dz
+# 			position2 = baxter_interface.Limb.Point(position.x + dx, position.y + dy, position.z + dz)
+# 			limb_joints = ik_solver.ik_solve("right", position2, orientation)
+# 			assert limb_joints not in [-1, 1]
+# 			all_joint_positions[c][r][d] = limb_joints
+# print
+# print all_joint_positions
+# with open("all_joint_positions.p", "wb") as file:
+# 	pickle.dump(all_joint_positions, file)
+
+with open("all_joint_positions.p", "rb") as file:
+	all_joint_positions = pickle.load(file)
+
+# for c in xrange(n_horizontal_ticks):
+# 	display("emoji_fine.png" if c%2==0 else "emoji_error.png")
+# 	for r in xrange(n_vertical_ticks) if c%2==0 else reversed(xrange(n_vertical_ticks)):
+# 		target_angles = all_joint_positions[c][r][1]
+# 		print c, r
+# 		right_limb.move_to_joint_positions(limb_joints, timeout=5.0, threshold=precision)
+
+print n_horizontal_ticks
+wire = [2, 1, 2, 1, 2, 2, 3, 4, 3, 4, 3, 2, 1, 0, 1, 1, 2] # 15 middle points
+trajectory = [2]
+tried = [[] for _ in xrange(n_horizontal_ticks)]
+
+print "move to initial position:", 0, trajectory[0]
+right_limb.set_joint_position_speed(0.2)
+display("emoji_happy.png")
+# middle position
+right_limb.move_to_joint_positions(safe_middle_position, timeout=5.0, threshold=precision)
+# start position
+right_limb.move_to_joint_positions(safe_initial_position, timeout=5.0, threshold=precision)
+target_angles = all_joint_positions[0][trajectory[0]][0]
+right_limb.move_to_joint_positions(target_angles, timeout=5.0, threshold=precision)
+target_angles = all_joint_positions[0][trajectory[0]][1]
+right_limb.move_to_joint_positions(target_angles, timeout=5.0, threshold=precision)
+
+print "start trials..."
+right_limb.set_joint_position_speed(1.0)
+c = 1
+while c != len(wire):
+	r = get_possible(trajectory[c-1], tried[c])
+	tried[c].append(r)
+	print c, "try", r, "solution", wire[c], trajectory,
+	target_angles = all_joint_positions[c][r][1]
+	#move_to(right_limb, target_angles, position.z + wire[c] * delta - height / 2, precision)
+	right_limb.move_to_joint_positions(target_angles, timeout=5.0, threshold=precision)
+	if r == wire[c]:
+		print "ok"
+		trajectory.append(r)
+		c += 1
+	else:
+		display("emoji_error.png")
+		print "contact... going back"
+		# go back
+		target_angles = all_joint_positions[c-1][trajectory[c-1]][1]
+		right_limb.move_to_joint_positions(target_angles, timeout=5.0, threshold=precision)
+		display("emoji_happy.png")
+
+'''
+for delta in xrange(0, 8):
+	position2 = baxter_interface.Limb.Point(position.x, position.y + delta / 10.0, position.z + -0.4 + delta / 10.0)
+	limb_joints = ik_solver.ik_solve('right', position2, orientation)
+	if limb_joints == -1:
+		print -1
+	elif limb_joints == 1:
+		print 1
+	else:
+		right_limb.move_to_joint_positions(limb_joints, timeout=5.0, threshold=precision)
+'''
+print "done!"
+display("emoji_great.png")
+
+print "move to initial position:", 0, trajectory[0]
+right_limb.set_joint_position_speed(0.2)
+# end position
+target_angles = all_joint_positions[-1][wire[-1]][0]
+right_limb.move_to_joint_positions(target_angles, timeout=5.0, threshold=precision)
+# middle position
+right_limb.move_to_joint_positions(safe_middle_position, timeout=5.0, threshold=precision)
+
+### END
+
+#rs.disable()
