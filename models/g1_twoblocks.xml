@@ -1,0 +1,490 @@
+<!-- ============================================================================
+  g1_twoblocks.xml — Unitree G1 (single right arm only) + two coloured blocks.
+
+  Scene geometry (table, blocks, cameras, floor) is an exact copy of
+  baxter_twoblocks.xml so the same six-task language template
+  ("move the {color} block to the {near/far} side") applies unchanged
+  across embodiments.
+
+  Design decisions (per project scoping discussion):
+    - Lower body locked: no freejoint, no leg joints, no waist joints.
+      Pelvis/waist/torso are fused into one static mount at a fixed
+      pedestal height chosen so the arm's workspace covers the table
+      (same table position as the Baxter/Franka scenes).
+    - Only the right arm is used for tasks — single-arm control, matching
+      Baxter/Franka. The left arm is present but purely for visual
+      completeness: it's actuated and held fixed at G1's stock "stand"
+      resting pose, and its actuators/qpos are deliberately appended
+      LAST so they sit outside the task's action/state space (only the
+      first 7+2 actuators — right arm + gripper — are used for data
+      collection/training).
+    - Native Dex3 hand (right) replaced with a simplified 1-DOF parallel
+      gripper — the same Rethink gripper subtree used in
+      baxter_twoblocks.xml (meshes/rethink_gripper), reused as-is for
+      design consistency across embodiments. The left hand keeps the
+      stock visual-only "rubber_hand" mesh (no gripper, unused).
+
+  Arm/torso kinematics + meshes from mujoco_menagerie's unitree_g1/g1.xml
+  (Apache-2.0 / BSD-3, see meshes/g1/LICENSE).
+
+  qpos order (37 values, nv=34):
+    cube_red_free  (7): x y z qw qx qy qz
+    cube_blue_free (7): x y z qw qx qy qz
+    cube_green_free(7): x y z qw qx qy qz
+    right arm      (7): shoulder_pitch shoulder_roll shoulder_yaw elbow
+                         wrist_roll wrist_pitch wrist_yaw
+    right gripper  (2): l_finger r_finger
+    left arm       (7): visual-only, not used for tasks
+
+  ctrl order (16 values):
+    right arm(7) | right gripper l,r (2) | left arm(7, visual-only)
+    — only the first 9 actuators are part of the task action space.
+============================================================================ -->
+<mujoco model="g1_twoblocks">
+
+  <compiler angle="radian" meshdir="/home/robotlab/Desktop/saniya_ws/pi0.5_mujoco/models/meshes" autolimits="true"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+    <global offwidth="1280" offheight="720"/>
+  </visual>
+
+  <default>
+    <default class="g1">
+      <joint armature="0.01" frictionloss="0.3"/>
+      <position kp="500" dampratio="1" inheritrange="1"/>
+      <default class="visual">
+        <geom group="2" type="mesh" contype="0" conaffinity="0" density="0" material="metal"/>
+      </default>
+      <default class="collision">
+        <!-- contype/conaffinity=0: disabled rather than menagerie's default
+             (1,1). Upstream this drives whole-body self-collision (arm vs
+             torso, leg vs leg); here the torso/legs are fixed and we don't
+             need that fidelity, and leaving it on blocked the shoulder from
+             reaching several pregrasp poses (self-collision with the torso
+             partway through the reach). The gripper's own finger_col /
+             explicit-contype geoms are unaffected and still collide with
+             the table and blocks normally. -->
+        <geom group="3" type="mesh" contype="0" conaffinity="0"/>
+      </default>
+    </default>
+    <!-- Rethink parallel-jaw gripper, reused verbatim from baxter_twoblocks.xml -->
+    <default class="visual_gripper">
+      <geom contype="0" conaffinity="0"/>
+    </default>
+    <default class="finger_col">
+      <geom contype="2" conaffinity="5" rgba="0.1 0.1 0.1 0" friction="0.8 0.1 0.1"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="black" rgba="0.2 0.2 0.2 1"/>
+    <material name="metal" rgba="0.7 0.7 0.7 1"/>
+
+    <mesh name="pelvis_mesh"      file="g1/pelvis.STL"/>
+    <mesh name="pelvis_contour"   file="g1/pelvis_contour_link.STL"/>
+    <mesh name="waist_yaw_mesh"   file="g1/waist_yaw_link_rev_1_0.STL"/>
+    <mesh name="waist_roll_mesh"  file="g1/waist_roll_link_rev_1_0.STL"/>
+    <mesh name="torso_mesh"       file="g1/torso_link_rev_1_0.STL"/>
+    <mesh name="logo_mesh"        file="g1/logo_link.STL"/>
+    <mesh name="head_mesh"        file="g1/head_link.STL"/>
+    <mesh name="r_shoulder_pitch" file="g1/right_shoulder_pitch_link.STL"/>
+    <mesh name="r_shoulder_roll"  file="g1/right_shoulder_roll_link.STL"/>
+    <mesh name="r_shoulder_yaw"   file="g1/right_shoulder_yaw_link.STL"/>
+    <mesh name="r_elbow"          file="g1/right_elbow_link.STL"/>
+    <mesh name="r_wrist_roll"     file="g1/right_wrist_roll_link.STL"/>
+    <mesh name="r_wrist_pitch"    file="g1/right_wrist_pitch_link.STL"/>
+    <mesh name="r_wrist_yaw"      file="g1/right_wrist_yaw_link.STL"/>
+
+    <!-- Left arm — visual completeness only, not part of the task action space -->
+    <mesh name="l_shoulder_pitch" file="g1/left_shoulder_pitch_link.STL"/>
+    <mesh name="l_shoulder_roll"  file="g1/left_shoulder_roll_link.STL"/>
+    <mesh name="l_shoulder_yaw"   file="g1/left_shoulder_yaw_link.STL"/>
+    <mesh name="l_elbow"          file="g1/left_elbow_link.STL"/>
+    <mesh name="l_wrist_roll"     file="g1/left_wrist_roll_link.STL"/>
+    <mesh name="l_wrist_pitch"    file="g1/left_wrist_pitch_link.STL"/>
+    <mesh name="l_wrist_yaw"      file="g1/left_wrist_yaw_link.STL"/>
+    <mesh name="l_rubber_hand"    file="g1/left_rubber_hand.STL"/>
+
+    <!-- Rethink gripper meshes (shared with Baxter) -->
+    <mesh name="standard_narrow"         file="rethink_gripper/standard_narrow.stl"/>
+    <mesh name="half_round_tip"          file="rethink_gripper/half_round_tip.stl"/>
+    <mesh name="electric_gripper_base_0" file="rethink_gripper/electric_gripper_base_0.obj"/>
+    <mesh name="electric_gripper_base_1" file="rethink_gripper/electric_gripper_base_1.obj"/>
+    <mesh name="connector_plate"         file="rethink_gripper/connector_plate.obj"/>
+
+    <material name="gripper_mat_dark"  specular="0.5" shininess="0.25" rgba="0.001651 0.001651 0.001651 1"/>
+    <material name="gripper_mat_red"   specular="0.5" shininess="0.25" rgba="0.64 0.00 0.00 1"/>
+    <material name="gripper_mat_grey"  specular="0.5" shininess="0.25" rgba="0.64 0.64 0.64 1"/>
+    <material name="finger_mat"        specular="0.5" shininess="0.25" rgba="0.00 0.00 0.00 1"/>
+  </asset>
+
+  <worldbody>
+
+    <!-- ── SCENE CAMERA (world-fixed) — identical to Baxter scene ─────────── -->
+    <body name="scene_camera_body" pos="1.0 -1.2 1.2">
+      <camera name="scene_camera" xyaxes="0.832 0.555 0  -0.400 0.600 0.693" fovy="55"/>
+    </body>
+    <body name="vlm_camera_body" pos="0.675 -0.15 1.05">
+      <camera name="vlm_camera" xyaxes="1 0 0  0 1 0" fovy="30"/>
+    </body>
+
+    <!-- Lighting -->
+    <light pos="0 0 4"   dir="0 0 -1"    diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="true"/>
+    <light pos="2 2 3"   dir="-1 -1 -1"  diffuse="0.5 0.5 0.5" castshadow="false"/>
+
+    <!-- Floor -->
+    <geom name="floor" type="plane" size="5 5 0.1" rgba="0.75 0.75 0.75 1"
+          pos="0 0 -0.93" contype="1" conaffinity="4" friction="0.8 0.1 0.1"/>
+
+    <!-- ── TABLE (identical layout to baxter_twoblocks.xml) ─────────────── -->
+    <body name="table" pos="0.70 -0.15 0.235">
+      <geom name="table_top"  type="box" size="0.30 0.35 0.025"
+            rgba="0.55 0.40 0.25 1" contype="1" conaffinity="4"
+            friction="0.8 0.1 0.1"/>
+      <geom name="table_leg1" type="cylinder" size="0.02 0.49"
+            pos=" 0.27  0.32 -0.515" rgba="0.45 0.30 0.20 1"
+            contype="0" conaffinity="0"/>
+      <geom name="table_leg2" type="cylinder" size="0.02 0.49"
+            pos="-0.27  0.32 -0.515" rgba="0.45 0.30 0.20 1"
+            contype="0" conaffinity="0"/>
+      <geom name="table_leg3" type="cylinder" size="0.02 0.49"
+            pos=" 0.27 -0.32 -0.515" rgba="0.45 0.30 0.20 1"
+            contype="0" conaffinity="0"/>
+      <geom name="table_leg4" type="cylinder" size="0.02 0.49"
+            pos="-0.27 -0.32 -0.515" rgba="0.45 0.30 0.20 1"
+            contype="0" conaffinity="0"/>
+      <geom name="dividing_line" type="box" size="0.003 0.35 0.002"
+            pos="-0.02 0.0 0.027" rgba="0.9 0.8 0.0 1"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- ── RED / BLUE / GREEN BLOCKS (identical to baxter_twoblocks.xml) ── -->
+    <body name="target_cube_red" pos="0.70 -0.15 0.285">
+      <joint name="cube_red_free" type="free"/>
+      <inertial pos="0 0 0" mass="0.050" diaginertia="2e-5 2e-5 2e-5"/>
+      <geom name="cube_red" type="box" size="0.025 0.025 0.025"
+            rgba="0.9 0.1 0.1 1" contype="4" conaffinity="5"
+            friction="0.6 0.1 0.1"/>
+    </body>
+
+    <body name="target_cube_blue" pos="0.70 -0.35 0.285">
+      <joint name="cube_blue_free" type="free"/>
+      <inertial pos="0 0 0" mass="0.050" diaginertia="2e-5 2e-5 2e-5"/>
+      <geom name="cube_blue" type="box" size="0.025 0.025 0.025"
+            rgba="0.1 0.1 0.9 1" contype="4" conaffinity="5"
+            friction="0.6 0.1 0.1"/>
+    </body>
+
+    <body name="target_cube_green" pos="0.70 0.05 0.285">
+      <joint name="cube_green_free" type="free"/>
+      <inertial pos="0 0 0" mass="0.050" diaginertia="2e-5 2e-5 2e-5"/>
+      <geom name="cube_green" type="box" size="0.025 0.025 0.025"
+            rgba="0.1 0.8 0.1 1" contype="4" conaffinity="5"
+            friction="0.6 0.1 0.1"/>
+    </body>
+
+    <!-- ============================================================
+      G1 TORSO MOUNT — pelvis/waist/torso fused static (no freejoint,
+      no leg/waist joints). Pedestal height chosen so the right arm's
+      workspace covers the table (same convention as Baxter/Franka).
+    ============================================================ -->
+    <body name="pelvis" pos="0.40 0 0.208" childclass="g1">
+      <geom class="visual" material="black" mesh="pelvis_mesh"/>
+      <geom class="visual" mesh="pelvis_contour"/>
+      <geom class="collision" mesh="pelvis_contour"/>
+
+      <!-- Pedestal — visual/collision mount down to the floor (floor at world z=-0.93) -->
+      <geom name="pedestal_c" type="cylinder" size="0.15 0.569" pos="0 0 -0.569"
+            rgba="0.2 0.2 0.2 1" contype="0" conaffinity="0"/>
+
+      <!-- waist_yaw_link / waist_roll_link / torso_link: fused (no joints),
+           offsets copied verbatim from unitree_g1/g1.xml -->
+      <body name="waist_yaw_link">
+        <geom class="visual" mesh="waist_yaw_mesh"/>
+        <body name="waist_roll_link" pos="-0.0039635 0 0.044">
+          <geom class="visual" mesh="waist_roll_mesh"/>
+          <body name="torso_link">
+            <geom class="visual" mesh="torso_mesh"/>
+            <geom class="collision" mesh="torso_mesh"/>
+            <geom pos="0.0039635 0 -0.044" quat="1 0 0 0" class="visual" material="black" mesh="logo_mesh"/>
+            <geom pos="0.0039635 0 -0.044" quat="1 0 0 0" class="visual" material="black" mesh="head_mesh"/>
+            <geom pos="0.0039635 0 -0.044" quat="1 0 0 0" class="collision" material="black" mesh="head_mesh"/>
+
+            <!-- ============================================================
+              RIGHT ARM — 7 DOF, offsets/ranges copied verbatim from
+              unitree_g1/g1.xml (right_shoulder_pitch_joint ... right_wrist_yaw_joint)
+            ============================================================ -->
+            <body name="right_shoulder_pitch_link" pos="0.0039563 -0.10021 0.24778"
+              quat="0.990264 -0.139201 1.38722e-05 9.86868e-05">
+              <inertial pos="0 -0.035892 -0.011628" quat="0.68225 -0.326267 0.0130458 0.654152" mass="0.718"
+                diaginertia="0.000465864 0.000432842 0.000406394"/>
+              <joint name="right_shoulder_pitch_joint" axis="0 1 0" range="-3.0892 2.6704" actuatorfrcrange="-25 25"/>
+              <geom class="visual" mesh="r_shoulder_pitch"/>
+              <geom size="0.03 0.025" pos="0 -0.04 -0.01" quat="0.707107 0 0.707107 0" type="cylinder"
+                rgba="0.7 0.7 0.7 1" class="collision"/>
+              <body name="right_shoulder_roll_link" pos="0 -0.038 -0.013831" quat="0.990268 0.139172 0 0">
+                <inertial pos="-0.000227 -0.00727 -0.063243" quat="0.712604 -0.00710317 -0.0196223 0.701256"
+                  mass="0.643" diaginertia="0.000691311 0.000618011 0.000388977"/>
+                <joint name="right_shoulder_roll_joint" axis="1 0 0" range="-2.2515 1.5882" actuatorfrcrange="-25 25"/>
+                <geom class="visual" mesh="r_shoulder_roll"/>
+                <geom size="0.03 0.015" pos="-0.004 -0.006 -0.053" type="cylinder" rgba="0.7 0.7 0.7 1"
+                  class="collision"/>
+                <body name="right_shoulder_yaw_link" pos="0 -0.00624 -0.1032">
+                  <inertial pos="0.010773 0.002949 -0.072009" quat="0.687134 -0.0679942 -0.0964829 0.716879"
+                    mass="0.734" diaginertia="0.00106187 0.00103217 0.000400661"/>
+                  <joint name="right_shoulder_yaw_joint" axis="0 0 1" range="-2.618 2.618" actuatorfrcrange="-25 25"/>
+                  <geom class="visual" mesh="r_shoulder_yaw"/>
+                  <geom class="collision" mesh="r_shoulder_yaw"/>
+                  <body name="right_elbow_link" pos="0.015783 0 -0.080518">
+                    <inertial pos="0.064956 -0.004454 -0.010062" quat="0.388129 0.388821 0.636132 0.541765" mass="0.6"
+                      diaginertia="0.000443035 0.000421612 0.000259353"/>
+                    <joint name="right_elbow_joint" axis="0 1 0" range="-1.0472 2.0944" actuatorfrcrange="-25 25"/>
+                    <geom class="visual" mesh="r_elbow"/>
+                    <geom class="collision" mesh="r_elbow"/>
+                    <body name="right_wrist_roll_link" pos="0.1 -0.00188791 -0.01">
+                      <inertial pos="0.0171394 -0.000537591 4.8864e-07" quat="0.411667 0.575338 -0.411094 0.574906"
+                        mass="0.085445" diaginertia="5.48211e-05 4.96646e-05 3.57798e-05"/>
+                      <joint name="right_wrist_roll_joint" axis="1 0 0" range="-1.97222 1.97222"
+                        actuatorfrcrange="-25 25"/>
+                      <geom class="visual" mesh="r_wrist_roll"/>
+                      <geom class="collision" mesh="r_wrist_roll"/>
+                      <body name="right_wrist_pitch_link" pos="0.038 0 0">
+                        <inertial pos="0.0229999 0.00111685 -0.00111658" quat="0.643608 0.293036 0.661363 0.249998"
+                          mass="0.48405" diaginertia="0.000430353 0.000429873 0.000164648"/>
+                        <joint name="right_wrist_pitch_joint" axis="0 1 0" range="-1.61443 1.61443"
+                          actuatorfrcrange="-5 5"/>
+                        <geom class="visual" mesh="r_wrist_pitch"/>
+                        <geom class="collision" mesh="r_wrist_pitch"/>
+                        <body name="right_wrist_yaw_link" pos="0.046 0 0">
+                          <inertial pos="0.0708244 -0.000191745 0.00161742" quat="0.493188 0.468078 0.526295 0.510571"
+                            mass="0.254576" diaginertia="0.000646113 0.000559993 0.000147566"/>
+                          <joint name="right_wrist_yaw_joint" axis="0 0 1" range="-1.61443 1.61443"
+                            actuatorfrcrange="-5 5"/>
+                          <geom class="visual" mesh="r_wrist_yaw"/>
+                          <geom class="collision" mesh="r_wrist_yaw"/>
+
+                          <!-- ── SIMPLIFIED 1-DOF PARALLEL GRIPPER ──────────────────
+                               Rethink gripper subtree, reused verbatim from
+                               baxter_twoblocks.xml, replacing the native Dex3 hand /
+                               rubber_hand placeholder. -->
+                          <body name="right_gripper" pos="0.0415 -0.003 0" quat="0.7071068 0 0.7071068 0">
+                            <inertial pos="0 0 0" quat="-0.5 0.5 0.5 0.5" mass="0.3"
+                                      diaginertia="3e-08 2e-08 2e-08"/>
+                            <site name="right_ft_frame" pos="0 0 0" size="0.01" rgba="1 0 0 1"
+                                  type="sphere" group="1"/>
+
+                            <!-- Wrist camera — attached at the same offset (relative to
+                                 right_gripper) that baxter_twoblocks.xml uses relative to
+                                 right_hand, adjusted for the right_gripper pos="0 0 0.025"
+                                 translation Baxter applies between those two frames. -->
+                            <body name="right_hand_camera_body" pos="0.06 0 0.015" euler="0 1.5708 0">
+                              <inertial pos="0 0 0" mass="0.0001" diaginertia="1e-8 1e-8 1e-8"/>
+                              <camera name="right_hand_camera" fovy="90"/>
+                            </body>
+                            <geom class="visual_gripper" name="rgrip_connector_v"
+                                  type="mesh" mesh="connector_plate" material="gripper_mat_dark"
+                                  pos="0 0 0.0018" quat="0.7071068 0 0 0.7071068"/>
+                            <geom class="visual_gripper" name="rgrip_base0_v"
+                                  type="mesh" mesh="electric_gripper_base_0" material="gripper_mat_grey"
+                                  pos="0 0 0.0194" quat="0.7071068 0 0 0.7071068"/>
+                            <geom class="visual_gripper" name="rgrip_base1_v"
+                                  type="mesh" mesh="electric_gripper_base_1" material="gripper_mat_red"
+                                  pos="0 0 0.0194" quat="0.7071068 0 0 0.7071068"/>
+                            <geom name="rgrip_base_c" type="cylinder" size="0.029 0.05"
+                                  pos="0.004 0.0 0.04" quat="0 0 0.707107 0.707107"
+                                  contype="2" conaffinity="5" rgba="0.3 0.3 0.3 0"/>
+
+                            <body name="right_gripper_eef" pos="0 0 0.109" quat="0.707105 0 0 -0.707105">
+                              <site name="right_grip_site" pos="0 0 0" size="0.01" rgba="1 0 0 0.5"
+                                    type="sphere" group="1"/>
+                            </body>
+
+                            <body name="right_l_finger" pos="0 0.01 0.0444">
+                              <inertial pos="0 0 0" quat="0 0 0 -1" mass="0.02"
+                                        diaginertia="0.01 0.01 0.01"/>
+                              <joint name="right_l_finger_joint" pos="0 0 0" axis="0 1 0"
+                                     type="slide" range="-0.0115 0.020833"
+                                     damping="100" armature="1.0" frictionloss="1.0"/>
+                              <geom class="visual_gripper" name="right_l_finger_v"
+                                    type="mesh" mesh="standard_narrow" material="finger_mat"
+                                    quat="0 0 0 -1"/>
+                              <geom class="finger_col" name="right_l_finger_g0"
+                                    type="box" size="0.005 0.00675 0.0375"
+                                    pos="0 0.01725 0.04" quat="0 0 0 -1"/>
+                              <geom class="finger_col" name="right_l_finger_g1"
+                                    type="box" size="0.005 0.025 0.0085"
+                                    pos="-0.005 -0.003 0.0083" quat="0 0 0 -1"/>
+                              <body name="right_l_finger_tip" pos="0 0.01725 0.075">
+                                <inertial pos="0 0 0" quat="0 0 0 1" mass="0.01"
+                                          diaginertia="0.01 0.01 0.01"/>
+                                <geom class="visual_gripper" name="right_l_fingertip_v"
+                                      type="mesh" mesh="half_round_tip" material="finger_mat"
+                                      quat="0 0 0 1"/>
+                                <geom class="finger_col" name="right_l_fingertip_g0"
+                                      type="box" size="0.004 0.004 0.0185"
+                                      pos="0 -0.0045 -0.015" quat="0 0 0 -1"/>
+                                <geom class="finger_col" name="right_l_fingerpad_g0"
+                                      type="box" size="0.0035 0.004 0.0165"
+                                      pos="0 -0.0047 -0.017"/>
+                              </body>
+                            </body>
+
+                            <body name="right_r_finger" pos="0 -0.01 0.0444">
+                              <inertial pos="0 0 0" mass="0.02" diaginertia="0.01 0.01 0.01"/>
+                              <joint name="right_r_finger_joint" pos="0 0 0" axis="0 1 0"
+                                     type="slide" range="-0.020833 0.0115"
+                                     damping="100" armature="1.0" frictionloss="1.0"/>
+                              <geom class="visual_gripper" name="right_r_finger_v"
+                                    type="mesh" mesh="standard_narrow" material="finger_mat"/>
+                              <geom class="finger_col" name="right_r_finger_g0"
+                                    type="box" size="0.005 0.00675 0.0375"
+                                    pos="0 -0.01725 0.04"/>
+                              <geom class="finger_col" name="right_r_finger_g1"
+                                    type="box" size="0.005 0.025 0.0085"
+                                    pos="0.005 0.003 0.0083"/>
+                              <body name="right_r_finger_tip" pos="0 -0.01725 0.075">
+                                <inertial pos="0 0 0" mass="0.01" diaginertia="0.01 0.01 0.01"/>
+                                <geom class="visual_gripper" name="right_r_fingertip_v"
+                                      type="mesh" mesh="half_round_tip" material="finger_mat"/>
+                                <geom class="finger_col" name="right_r_fingertip_g0"
+                                      type="box" size="0.004 0.004 0.0185"
+                                      pos="0 0.0045 -0.015"/>
+                                <geom class="finger_col" name="right_r_fingerpad_g0"
+                                      type="box" size="0.0035 0.004 0.0165"
+                                      pos="0 0.0047 -0.017"/>
+                              </body>
+                            </body>
+
+                          </body><!-- /right_gripper -->
+                        </body><!-- /right_wrist_yaw_link -->
+                      </body><!-- /right_wrist_pitch_link -->
+                    </body><!-- /right_wrist_roll_link -->
+                  </body><!-- /right_elbow_link -->
+                </body><!-- /right_shoulder_yaw_link -->
+              </body><!-- /right_shoulder_roll_link -->
+            </body><!-- /right_shoulder_pitch_link -->
+
+            <!-- ============================================================
+              LEFT ARM — visual completeness only. Actuated and held fixed
+              at the stock G1 "stand" resting pose (see unitree_g1/g1.xml
+              keyframe); its actuators are NOT part of the task action
+              space used for data collection/training (only the right arm
+              + gripper actuators, listed first, are used for that).
+            ============================================================ -->
+            <body name="left_shoulder_pitch_link" pos="0.0039563 0.10022 0.24778"
+              quat="0.990264 0.139201 1.38722e-05 -9.86868e-05">
+              <inertial pos="0 0.035892 -0.011628" quat="0.654152 0.0130458 -0.326267 0.68225" mass="0.718"
+                diaginertia="0.000465864 0.000432842 0.000406394"/>
+              <joint name="left_shoulder_pitch_joint" axis="0 1 0" range="-3.0892 2.6704" actuatorfrcrange="-25 25"/>
+              <geom class="visual" mesh="l_shoulder_pitch"/>
+              <geom size="0.03 0.025" pos="0 0.04 -0.01" quat="0.707107 0 0.707107 0" type="cylinder"
+                rgba="0.7 0.7 0.7 1" class="collision"/>
+              <body name="left_shoulder_roll_link" pos="0 0.038 -0.013831" quat="0.990268 -0.139172 0 0">
+                <inertial pos="-0.000227 0.00727 -0.063243" quat="0.701256 -0.0196223 -0.00710317 0.712604" mass="0.643"
+                  diaginertia="0.000691311 0.000618011 0.000388977"/>
+                <joint name="left_shoulder_roll_joint" axis="1 0 0" range="-1.5882 2.2515" actuatorfrcrange="-25 25"/>
+                <geom class="visual" mesh="l_shoulder_roll"/>
+                <geom size="0.03 0.015" pos="-0.004 0.006 -0.053" type="cylinder" rgba="0.7 0.7 0.7 1"
+                  class="collision"/>
+                <body name="left_shoulder_yaw_link" pos="0 0.00624 -0.1032">
+                  <inertial pos="0.010773 -0.002949 -0.072009" quat="0.716879 -0.0964829 -0.0679942 0.687134"
+                    mass="0.734" diaginertia="0.00106187 0.00103217 0.000400661"/>
+                  <joint name="left_shoulder_yaw_joint" axis="0 0 1" range="-2.618 2.618" actuatorfrcrange="-25 25"/>
+                  <geom class="visual" mesh="l_shoulder_yaw"/>
+                  <geom class="collision" mesh="l_shoulder_yaw"/>
+                  <body name="left_elbow_link" pos="0.015783 0 -0.080518">
+                    <inertial pos="0.064956 0.004454 -0.010062" quat="0.541765 0.636132 0.388821 0.388129" mass="0.6"
+                      diaginertia="0.000443035 0.000421612 0.000259353"/>
+                    <joint name="left_elbow_joint" axis="0 1 0" range="-1.0472 2.0944" actuatorfrcrange="-25 25"/>
+                    <geom class="visual" mesh="l_elbow"/>
+                    <geom class="collision" mesh="l_elbow"/>
+                    <body name="left_wrist_roll_link" pos="0.1 0.00188791 -0.01">
+                      <inertial pos="0.0171394 0.000537591 4.8864e-07" quat="0.575338 0.411667 -0.574906 0.411094"
+                        mass="0.085445" diaginertia="5.48211e-05 4.96646e-05 3.57798e-05"/>
+                      <joint name="left_wrist_roll_joint" axis="1 0 0" range="-1.97222 1.97222"
+                        actuatorfrcrange="-25 25"/>
+                      <geom class="visual" mesh="l_wrist_roll"/>
+                      <geom class="collision" mesh="l_wrist_roll"/>
+                      <body name="left_wrist_pitch_link" pos="0.038 0 0">
+                        <inertial pos="0.0229999 -0.00111685 -0.00111658" quat="0.249998 0.661363 0.293036 0.643608"
+                          mass="0.48405" diaginertia="0.000430353 0.000429873 0.000164648"/>
+                        <joint name="left_wrist_pitch_joint" axis="0 1 0" range="-1.61443 1.61443"
+                          actuatorfrcrange="-5 5"/>
+                        <geom class="visual" mesh="l_wrist_pitch"/>
+                        <geom class="collision" mesh="l_wrist_pitch"/>
+                        <body name="left_wrist_yaw_link" pos="0.046 0 0">
+                          <inertial pos="0.0708244 0.000191745 0.00161742" quat="0.510571 0.526295 0.468078 0.493188"
+                            mass="0.254576" diaginertia="0.000646113 0.000559993 0.000147566"/>
+                          <joint name="left_wrist_yaw_joint" axis="0 0 1" range="-1.61443 1.61443"
+                            actuatorfrcrange="-5 5"/>
+                          <geom class="visual" mesh="l_wrist_yaw"/>
+                          <geom class="collision" mesh="l_wrist_yaw"/>
+                          <geom pos="0.0415 0.003 0" quat="1 0 0 0" class="visual" mesh="l_rubber_hand"/>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body><!-- /left_shoulder_pitch_link -->
+          </body><!-- /torso_link -->
+        </body><!-- /waist_roll_link -->
+      </body><!-- /waist_yaw_link -->
+    </body><!-- /pelvis -->
+  </worldbody>
+
+  <!-- ================================================================
+    ACTUATORS — ctrl order: right arm (7, position) | gripper (2, position)
+  ================================================================ -->
+  <actuator>
+    <position class="g1" name="right_shoulder_pitch" joint="right_shoulder_pitch_joint"/>
+    <position class="g1" name="right_shoulder_roll"  joint="right_shoulder_roll_joint"/>
+    <position class="g1" name="right_shoulder_yaw"   joint="right_shoulder_yaw_joint"/>
+    <position class="g1" name="right_elbow"          joint="right_elbow_joint"/>
+    <position class="g1" name="right_wrist_roll"     joint="right_wrist_roll_joint"/>
+    <position class="g1" name="right_wrist_pitch"    joint="right_wrist_pitch_joint"/>
+    <position class="g1" name="right_wrist_yaw"      joint="right_wrist_yaw_joint"/>
+
+    <position name="right_gripper_l" joint="right_l_finger_joint"
+              kp="1000" forcelimited="true" forcerange="-20 20"
+              ctrllimited="true" ctrlrange="-0.0115 0.020833"/>
+    <position name="right_gripper_r" joint="right_r_finger_joint"
+              kp="1000" forcelimited="true" forcerange="-20 20"
+              ctrllimited="true" ctrlrange="-0.020833 0.0115"/>
+
+    <!-- Left arm — visual completeness only, excluded from the task action space -->
+    <position class="g1" name="left_shoulder_pitch" joint="left_shoulder_pitch_joint"/>
+    <position class="g1" name="left_shoulder_roll"  joint="left_shoulder_roll_joint"/>
+    <position class="g1" name="left_shoulder_yaw"   joint="left_shoulder_yaw_joint"/>
+    <position class="g1" name="left_elbow"          joint="left_elbow_joint"/>
+    <position class="g1" name="left_wrist_roll"     joint="left_wrist_roll_joint"/>
+    <position class="g1" name="left_wrist_pitch"    joint="left_wrist_pitch_joint"/>
+    <position class="g1" name="left_wrist_yaw"      joint="left_wrist_yaw_joint"/>
+  </actuator>
+
+  <sensor>
+    <force  name="right_force_ee"  site="right_ft_frame"/>
+    <torque name="right_torque_ee" site="right_ft_frame"/>
+  </sensor>
+
+  <!-- ================================================================
+    KEYFRAME — "home" pose, right gripper open, right arm tucked above
+    table, left arm held at the stock G1 "stand" resting pose (visual
+    completeness only).
+    qpos (37 values): red(7) blue(7) green(7) right_arm(7) right_grip(2) left_arm(7)
+  ================================================================ -->
+  <keyframe>
+    <key name="home"
+         qpos="0.70 -0.15 0.285 1 0 0 0
+               0.70 -0.35 0.285 1 0 0 0
+               0.70  0.05 0.285 1 0 0 0
+               -1.6 -0.2 0 1.6 0 0 0   0.020833 -0.020833
+               0.2 0.2 0 1.28 0 0 0"
+         ctrl="-1.6 -0.2 0 1.6 0 0 0   0.020833 -0.020833
+               0.2 0.2 0 1.28 0 0 0"/>
+  </keyframe>
+
+</mujoco>

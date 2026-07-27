@@ -7,18 +7,23 @@ Replaces the MuJoCo simulation client. Connects to the policy server
 running on the lab PC, reads observations from the real Baxter robot,
 and executes returned action chunks via the P-controller.
 
+The workspace/scene camera is a RealSense attached directly to the lab PC,
+not this machine — the server injects "observation/image" itself (see
+serve_policy_realsense.py). This client only reads joint state + the Baxter
+wrist camera over ROS and sends those two plus the prompt.
+
 Python 2.7 compatible (ROS Indigo).
 
 Usage
 -----
     # On the lab PC (policy server already running):
-    #   uv run scripts/serve_policy.py policy:checkpoint \
+    #   uv run scripts/serve_policy_realsense.py \
     #       --policy.config pi05_baxter_pickplace_pos_v3 \
     #       --policy.dir checkpoints/pi05_baxter_pickplace_pos_v3/<run>/<step>
 
     # On the remote PC (this script):
     #   source ros_ws/baxter.sh
-    #   python baxter_policy_client.py --task 0 --host 192.168.0.103
+    #   python baxter_policy_client.py --task 0 --host 192.168.0.104
 
 Tasks
 -----
@@ -117,13 +122,12 @@ def gripper_norm_to_position(norm):
 
 class BaxterPolicyClient(object):
 
-    def __init__(self, host, port, prompt, workspace_topic, wrist_topic):
+    def __init__(self, host, port, prompt, wrist_topic):
         self.prompt = prompt
         self._shutdown = False
         self._bridge = CvBridge()
 
-        self._workspace_img = None   # latest (224, 224, 3) uint8 RGB
-        self._wrist_img = None
+        self._wrist_img = None   # latest (224, 224, 3) uint8 RGB
 
         # ── Baxter interfaces ─────────────────────────────────────────────────
         rospy.loginfo("Enabling robot...")
@@ -144,10 +148,9 @@ class BaxterPolicyClient(object):
         # ~100 ms inference gap between action chunks.
         self._limb.set_command_timeout(1.0)
 
-        # ── Camera subscribers ────────────────────────────────────────────────
-        rospy.loginfo("Subscribing to cameras...")
-        rospy.Subscriber(workspace_topic, Image, self._cb_workspace, queue_size=1)
-        rospy.Subscriber(wrist_topic,     Image, self._cb_wrist,     queue_size=1)
+        # ── Camera subscriber ─────────────────────────────────────────────────
+        rospy.loginfo("Subscribing to wrist camera...")
+        rospy.Subscriber(wrist_topic, Image, self._cb_wrist, queue_size=1)
 
         # ── WebSocket connection to policy server ─────────────────────────────
         url = "ws://{}:{}".format(host, port)
@@ -167,14 +170,7 @@ class BaxterPolicyClient(object):
         # State for gripper latch logic
         self._grasp_occurred = False
 
-    # ── Camera callbacks ──────────────────────────────────────────────────────
-
-    def _cb_workspace(self, msg):
-        try:
-            img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='rgb8')
-            self._workspace_img = resize_with_pad(img, IMG_SIZE, IMG_SIZE).astype(np.uint8)
-        except Exception as e:
-            rospy.logwarn_throttle(5.0, "Workspace camera error: %s", e)
+    # ── Camera callback ───────────────────────────────────────────────────────
 
     def _cb_wrist(self, msg):
         try:
@@ -261,17 +257,17 @@ class BaxterPolicyClient(object):
     # ── Main loop ─────────────────────────────────────────────────────────────
 
     def run(self):
-        rospy.loginfo("Waiting for camera images...")
+        rospy.loginfo("Waiting for wrist camera image...")
         deadline = rospy.Time.now() + rospy.Duration(10.0)
         while not rospy.is_shutdown():
-            if self._workspace_img is not None and self._wrist_img is not None:
+            if self._wrist_img is not None:
                 break
             if rospy.Time.now() > deadline:
-                rospy.logerr("Timed out waiting for camera images. Check topics.")
+                rospy.logerr("Timed out waiting for wrist camera image. Check topic.")
                 return
             rospy.sleep(0.1)
 
-        rospy.loginfo("Images received. Starting policy loop.")
+        rospy.loginfo("Image received. Starting policy loop.")
         rospy.loginfo("Prompt: '%s'", self.prompt)
 
         rate = rospy.Rate(CONTROL_HZ)
@@ -290,7 +286,6 @@ class BaxterPolicyClient(object):
                 self._stop_arm()
 
                 obs = {
-                    "observation/image":       np.transpose(self._workspace_img, (2, 0, 1)),
                     "observation/wrist_image": np.transpose(self._wrist_img, (2, 0, 1)),
                     "observation/state":       state,
                     "prompt":                  self.prompt,
@@ -339,13 +334,10 @@ def main():
                         help="Task index 0-5 (see TASKS dict)")
     parser.add_argument("--prompt", "-p", type=str, default=None,
                         help="Override language prompt")
-    parser.add_argument("--host", type=str, default="192.168.0.103",
+    parser.add_argument("--host", type=str, default="192.168.0.104",
                         help="Policy server IP (this PC)")
     parser.add_argument("--port", type=int, default=8000,
                         help="Policy server port")
-    parser.add_argument("--workspace-topic", type=str,
-                        default="/cameras/head_camera/image",
-                        help="ROS topic for workspace/scene camera")
     parser.add_argument("--wrist-topic", type=str,
                         default="/cameras/right_hand_camera/image",
                         help="ROS topic for wrist camera")
@@ -365,7 +357,6 @@ def main():
         host=args.host,
         port=args.port,
         prompt=prompt,
-        workspace_topic=args.workspace_topic,
         wrist_topic=args.wrist_topic,
     )
     client.run()
