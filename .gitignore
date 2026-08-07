@@ -2,6 +2,9 @@
 *.hdf5
 *.bag
 
+# Camera alignment snapshots (runtime output)
+real_robot/camera_snapshots/
+
 # Videos
 *.mp4
 *.avi
