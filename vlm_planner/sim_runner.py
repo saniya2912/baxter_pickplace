@@ -87,13 +87,23 @@ class SimRunner:
         self.client = _ws.WebsocketClientPolicy(HOST, PORT)
         print("[Sim] Connected.")
 
-        if use_viewer:
-            import mujoco.viewer as _viewer_mod
-            self._viewer = _viewer_mod.launch_passive(self.model, self.data)
-            self._viewer.cam.lookat[:] = [0.68, -0.15, 0.35]
-            self._viewer.cam.distance  = 1.6
-            self._viewer.cam.elevation = -22
-            self._viewer.cam.azimuth   = 155
+        # Viewer is NOT opened here even if use_viewer=True — call open_viewer()
+        # explicitly when ready to show it. This lets a caller place blocks,
+        # render, and run the first planning round headless (so it can print a
+        # goal/plan summary) before the window appears, rather than showing an
+        # empty/pre-plan window while the first VLM query is still running.
+
+    def open_viewer(self):
+        """Launch the passive viewer window. No-op if use_viewer=False or already open."""
+        if not self._use_viewer or self._viewer is not None:
+            return
+        import mujoco.viewer as _viewer_mod
+        self._viewer = _viewer_mod.launch_passive(self.model, self.data)
+        self._viewer.cam.lookat[:] = [0.68, -0.15, 0.35]
+        self._viewer.cam.distance  = 1.6
+        self._viewer.cam.elevation = -22
+        self._viewer.cam.azimuth   = 155
+        self._viewer.sync()
 
     # ── Scene helpers ──────────────────────────────────────────────────────────
 
@@ -117,6 +127,17 @@ class SimRunner:
 
     def get_scene_image_bgr(self) -> np.ndarray:
         self.renderer.update_scene(self.data, camera="scene_camera")
+        return cv2.cvtColor(self.renderer.render().copy(), cv2.COLOR_RGB2BGR)
+
+    def get_vlm_image_bgr(self) -> np.ndarray:
+        """Top-down view for VLM comparison — matches the camera
+        render_goal_images_6task.py uses for the goal images. The VLM was
+        being shown a top-down goal image against an oblique-angle
+        (scene_camera) current image; two different viewing angles make
+        relative near/far judgment far harder than it needs to be, and were
+        the likely dominant cause of unreliable position reads, more so than
+        prompt wording."""
+        self.renderer.update_scene(self.data, camera="vlm_camera")
         return cv2.cvtColor(self.renderer.render().copy(), cv2.COLOR_RGB2BGR)
 
     # ── Observation helpers ────────────────────────────────────────────────────
@@ -207,7 +228,7 @@ class SimRunner:
             t += 1
 
         print(f"[Sim] Task done at step {t}.")
-        return self.get_scene_image_bgr()
+        return self.get_vlm_image_bgr()
 
     def close(self):
         if self._viewer is not None:

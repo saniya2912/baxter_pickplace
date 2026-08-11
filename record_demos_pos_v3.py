@@ -84,7 +84,17 @@ KP_ROT    = 2.0
 # ── Block-specific arm poses ──────────────────────────────────────────────────
 Q_MID_RED   = np.array([0.4937,  1.1058, -0.364,  0.1252, 1.1227, 1.3903, -1.78])
 Q_MID_BLUE  = np.array([-0.1269, 1.1552, -0.7716, 0.8063, 1.6711, 1.0988, -1.632])
-Q_MID_GREEN = np.array([0.8428,  1.0696, -0.5317, 0.0973, 1.1296, 1.1774, -1.78])
+
+# Original hand-tuned green pose had s1=1.0696, which exceeds Baxter's right_s1
+# joint limit (max 1.047) -- the arm permanently saturated against that hard
+# stop during phase-1 approach (residual never converged, same fixed offset
+# every episode), leaving every downstream phase working from a strained pose.
+# Scripted-IK yield was only 35%/17.5% (far/near). This replacement was solved
+# numerically: seeded from Q_MID_RED's already-working elbow-up joint config,
+# then DLS-iterated toward the green block's (x, y) with red's grasp
+# orientation as the target, clipping to joint limits with margin at every
+# step. Re-measured yield: 72.5%/97.5% (far/near).
+Q_MID_GREEN = np.array([0.9119, 0.9881, -0.5918, -0.03, 1.0709, 1.1922, -1.5703])
 
 # ── Randomisation ─────────────────────────────────────────────────────────────
 RAND_X = 0.03

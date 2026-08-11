@@ -6,7 +6,7 @@ the returned action chunk. NO robot motion. Run this before baxter_policy_client
 to verify the network, serialisation, and image format are all correct.
 
 Usage:
-    python test_connection.py --host 192.168.0.103 --task 0
+    python test_connection.py --host 192.168.0.104 --task 0
 """
 
 from __future__ import print_function
@@ -17,9 +17,37 @@ import time
 import numpy as np
 import websocket
 import msgpack
-import msgpack_numpy
 
-msgpack_numpy.patch()
+# Manual numpy (de)serialization matching openpi_client.msgpack_numpy's wire
+# format exactly. Do NOT use the standalone `msgpack_numpy` PyPI package here --
+# its sentinel-key convention (b"nd"/b"type"/b"kind") is incompatible with
+# openpi's own encoding (b"__ndarray__"/b"dtype"/b"shape") and silently fails
+# to reconstruct arrays on both sides, causing the server to error out on
+# undecodable input.
+
+def _pack_default(obj):
+    if isinstance(obj, np.ndarray):
+        return {
+            b"__ndarray__": True,
+            b"data": obj.tobytes(),
+            b"dtype": obj.dtype.str,
+            b"shape": obj.shape,
+        }
+    if isinstance(obj, np.generic):
+        return {
+            b"__npgeneric__": True,
+            b"data": obj.item(),
+            b"dtype": obj.dtype.str,
+        }
+    raise TypeError("Unsupported type for msgpack: %r" % (obj,))
+
+
+def _unpack_object_hook(obj):
+    if b"__ndarray__" in obj:
+        return np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"])
+    if b"__npgeneric__" in obj:
+        return np.dtype(obj[b"dtype"]).type(obj[b"data"])
+    return obj
 
 IMG_SIZE = 224
 
@@ -35,7 +63,7 @@ TASKS = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="192.168.0.103")
+    parser.add_argument("--host", type=str, default="192.168.0.104")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--task", "-t", type=int, default=0)
     args = parser.parse_args()
@@ -48,7 +76,7 @@ def main():
     ws.connect(url)
 
     meta_raw = ws.recv()
-    meta = msgpack.unpackb(meta_raw, raw=False)
+    meta = msgpack.unpackb(meta_raw, object_hook=_unpack_object_hook, raw=False)
     print("Server metadata: {}".format(meta))
 
     # Build a dummy observation (random images, zero state)
@@ -64,12 +92,12 @@ def main():
 
     print("Sending dummy observation (task {}: '{}') ...".format(args.task, prompt))
     t0 = time.time()
-    packed = msgpack.packb(obs)
+    packed = msgpack.packb(obs, default=_pack_default, use_bin_type=True)
     ws.send_binary(packed)
     raw = ws.recv()
     elapsed_ms = (time.time() - t0) * 1000.0
 
-    response = msgpack.unpackb(raw, raw=False)
+    response = msgpack.unpackb(raw, object_hook=_unpack_object_hook, raw=False)
     chunk = np.array(response["actions"])
 
     print("")

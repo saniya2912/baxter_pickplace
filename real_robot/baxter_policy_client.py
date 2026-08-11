@@ -8,7 +8,7 @@ running on the lab PC, reads observations from the real Baxter robot,
 and executes returned action chunks via the P-controller.
 
 The workspace/scene camera is a RealSense attached directly to the lab PC,
-not this machine — the server injects "observation/image" itself (see
+not this machine -- the server injects "observation/image" itself (see
 serve_policy_realsense.py). This client only reads joint state + the Baxter
 wrist camera over ROS and sends those two plus the prompt.
 
@@ -53,10 +53,37 @@ from cv_bridge import CvBridge
 
 import websocket
 import msgpack
-import msgpack_numpy
 
-# Patch msgpack globally to handle numpy arrays transparently
-msgpack_numpy.patch()
+# Manual numpy (de)serialization matching openpi_client.msgpack_numpy's wire
+# format exactly. Do NOT use the standalone `msgpack_numpy` PyPI package here --
+# its sentinel-key convention (b"nd"/b"type"/b"kind") is incompatible with
+# openpi's own encoding (b"__ndarray__"/b"dtype"/b"shape") and silently fails
+# to reconstruct arrays on both sides, causing the server to error out on
+# undecodable input.
+
+def _pack_default(obj):
+    if isinstance(obj, np.ndarray):
+        return {
+            b"__ndarray__": True,
+            b"data": obj.tobytes(),
+            b"dtype": obj.dtype.str,
+            b"shape": obj.shape,
+        }
+    if isinstance(obj, np.generic):
+        return {
+            b"__npgeneric__": True,
+            b"data": obj.item(),
+            b"dtype": obj.dtype.str,
+        }
+    raise TypeError("Unsupported type for msgpack: %r" % (obj,))
+
+
+def _unpack_object_hook(obj):
+    if b"__ndarray__" in obj:
+        return np.ndarray(buffer=obj[b"data"], dtype=np.dtype(obj[b"dtype"]), shape=obj[b"shape"])
+    if b"__npgeneric__" in obj:
+        return np.dtype(obj[b"dtype"]).type(obj[b"data"])
+    return obj
 
 # ── Constants — must match inference_pos_v3.py exactly ───────────────────────
 JOINT_NAMES = [
@@ -160,7 +187,7 @@ class BaxterPolicyClient(object):
 
         # Server sends metadata immediately on connection
         meta_raw = self._ws.recv()
-        meta = msgpack.unpackb(meta_raw, raw=False)
+        meta = msgpack.unpackb(meta_raw, object_hook=_unpack_object_hook, raw=False)
         rospy.loginfo("Connected. Server metadata: %s", meta)
 
         # ── Shutdown handlers ─────────────────────────────────────────────────
@@ -292,10 +319,10 @@ class BaxterPolicyClient(object):
                 }
 
                 t0 = time.time()
-                packed = msgpack.packb(obs)
+                packed = msgpack.packb(obs, default=_pack_default, use_bin_type=True)
                 self._ws.send_binary(packed)
                 raw = self._ws.recv()
-                response = msgpack.unpackb(raw, raw=False)
+                response = msgpack.unpackb(raw, object_hook=_unpack_object_hook, raw=False)
                 elapsed_ms = (time.time() - t0) * 1000.0
 
                 chunk = np.array(response["actions"])  # (10, N)
@@ -335,7 +362,7 @@ def main():
     parser.add_argument("--prompt", "-p", type=str, default=None,
                         help="Override language prompt")
     parser.add_argument("--host", type=str, default="192.168.0.104",
-                        help="Policy server IP (this PC)")
+                        help="Policy server IP (lab PC running serve_policy_realsense.py)")
     parser.add_argument("--port", type=int, default=8000,
                         help="Policy server port")
     parser.add_argument("--wrist-topic", type=str,

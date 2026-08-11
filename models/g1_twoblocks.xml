@@ -128,7 +128,7 @@
       <camera name="scene_camera" xyaxes="0.832 0.555 0  -0.400 0.600 0.693" fovy="55"/>
     </body>
     <body name="vlm_camera_body" pos="0.675 -0.15 1.05">
-      <camera name="vlm_camera" xyaxes="1 0 0  0 1 0" fovy="30"/>
+      <camera name="vlm_camera" xyaxes="1 0 0  0 1 0" fovy="40"/>
     </body>
 
     <!-- Lighting -->
