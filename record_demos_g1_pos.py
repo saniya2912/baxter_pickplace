@@ -124,6 +124,37 @@ Q_MID_RED   = np.array([-2.1305,  0.9238, -2.3989, -0.4314,  0.2322,  0.6640, -1
 Q_MID_BLUE  = np.array([-1.9247,  0.0533, -2.3794, -0.2443, -1.1813,  0.8971, -0.4829])
 Q_MID_GREEN = np.array([-1.4305,  0.7615, -1.7417,  0.2097,  0.2528,  0.3049, -1.2401])
 
+# ── Near-side pregrasp poses for blue/green, found separately from the poses
+#    above. Root cause of blue-near/green-near's previously-documented 0%
+#    yield: Q_MID_BLUE/Q_MID_GREEN were only ever searched against the
+#    far-side spawn corner and reused unchanged for near-side too -- but for
+#    a "near" destination task, the block *spawns* at X_FAR (0.75) and gets
+#    carried to X_NEAR; the pregrasp pose needs to reach the *spawn* corner,
+#    which is the harder of the two. (First attempt at this fix mistakenly
+#    targeted the destination x=0.60 instead of the spawn x=0.75 -- caught
+#    because blue-near barely improved under it while green-near did, which
+#    only made sense once traced back to the wrong target.) An offline
+#    global search (300 random restarts + coordinate hill-climb, targeting
+#    each color's near-task spawn-corner hover point, x=0.75) found both
+#    are fully position-reachable (0 residual) with a real but moderate
+#    orientation cost (19.1deg / 10.9deg off pure top-down) -- a genuine
+#    reach/orientation trade-off at that corner, unlike the false "0%,
+#    unreachable" conclusion in cross_embodiment.md §4.11, which was
+#    diagnosing the online DLS-IK6D controller stuck in a bad convergence
+#    basin around a Q_MID that was never searched for this corner at all.
+#    No pelvis reposition needed. ─────────────────────────────────────────
+Q_MID_BLUE_NEAR  = np.array([-1.5849, -0.9828, -0.872, 1.7376, 0.8539, 0.5251, -1.2678])
+Q_MID_GREEN_NEAR = np.array([-1.8725, 0.2543, -0.6616, 1.5475, 1.3178, -0.5542, -1.5041])
+
+# Relaxed grasp-orientation target for blue-near only: forcing pure top-down
+# (TARGET_QUAT) at this corner fights the position objective (0 position
+# residual is achievable, but only at ~19deg off top-down -- a genuine
+# trade-off, confirmed via offline search), and the live weighted 6D IK
+# settles at a compromise that satisfies neither tolerance well (~25% yield
+# even after Q_MID_BLUE_NEAR). Using the tilt Q_MID_BLUE_NEAR itself already
+# settles at as the *target* removes the fight entirely.
+TARGET_QUAT_BLUE_NEAR = np.array([0.1584, 0.0210, 0.9861, -0.0462])
+
 # ── Randomisation ─────────────────────────────────────────────────────────────
 RAND_X = 0.03
 RAND_Y = 0.02
@@ -323,11 +354,14 @@ def collect_episode(model, data, task_cfg: dict, renderer, joint_ranges, viewer=
     if block == "red":
         q_mid = Q_MID_RED.copy()
     elif block == "blue":
-        q_mid = Q_MID_BLUE.copy()
+        q_mid = Q_MID_BLUE_NEAR.copy() if dest == "near" else Q_MID_BLUE.copy()
     else:
-        q_mid = Q_MID_GREEN.copy()
+        q_mid = Q_MID_GREEN_NEAR.copy() if dest == "near" else Q_MID_GREEN.copy()
 
-    target_quat = TARGET_QUAT.copy()
+    if block == "blue" and dest == "near":
+        target_quat = TARGET_QUAT_BLUE_NEAR.copy()
+    else:
+        target_quat = TARGET_QUAT.copy()
     kwargs = dict(joint_ranges=joint_ranges, viewer=viewer)
 
     # Phase 0: settle + open gripper
@@ -345,6 +379,20 @@ def collect_episode(model, data, task_cfg: dict, renderer, joint_ranges, viewer=
     run_cart_phase(model, data, renderer, site_id, above_tgt, q_mid,
                    0.0, imgs, wrists, states, actions,
                    tol=0.05, timeout_steps=50, **kwargs)
+
+    # Phase 2a.5: orientation-alignment, blue-near only. Phase 2a only
+    # controls position, never orientation, so the online "above" pose lands
+    # ~20+deg off the top-down target -- that gap then gets fought *during*
+    # the 6D descent (2b), which for blue-near stalls at a spurious IK
+    # equilibrium (position residual plateaus ~3.6cm, never times out into
+    # convergence -- confirmed via step-by-step trace, qdot goes to ~0 while
+    # still far from grasp_tgt). Aligning orientation here, while still at
+    # hover height, lets phase 2b's descent be dominantly vertical. Scoped
+    # to blue-near only since it can't affect any other task's Q_MID/phases.
+    if block == "blue" and dest == "near":
+        run_cart_phase_6d(model, data, renderer, site_id, above_tgt, target_quat,
+                          q_mid, 0.0, imgs, wrists, states, actions,
+                          tol=0.008, timeout_steps=40, **kwargs)
 
     block_pos = data.qpos[block_adr:block_adr + 3].copy()
 

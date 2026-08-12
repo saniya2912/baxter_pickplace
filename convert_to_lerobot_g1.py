@@ -3,10 +3,11 @@ Convert G1 (single right arm) position-control demos to a LeRobot dataset.
 
 Adapted from convert_to_lerobot_pos_v3.py (Baxter) / convert_to_lerobot_franka.py.
 Same 11-dim state / 8-dim action schema as the other two embodiments (7-DOF
-arm + gripper + EE xyz). Only 4 of the 6 tasks are included — blue-near and
-green-near have no successful episodes to convert (G1's arm can't reach that
-corner of the table; see record_demos_g1_pos.py for the reach-envelope
-trade-off this came down to).
+arm + gripper + EE xyz). All 6 tasks are included. (Previously blue-near and
+green-near were excluded here since they had zero successful episodes at the
+time -- that was a bug in record_demos_g1_pos.py's near-side Q_MID poses,
+since fixed; both tasks now have 100+ successful episodes, see
+record_demos_g1_pos.py.)
 
 Usage (run from the openpi directory with uv):
   uv run python ~/Desktop/saniya_ws/baxter_pickplace/convert_to_lerobot_g1.py
@@ -30,13 +31,13 @@ IMG_H, IMG_W = 224, 224
 ROOT = pathlib.Path(__file__).parent
 DATA_ROOT = ROOT / "data" / "pickplace_g1_pos"
 
-# Only the 4 tasks with successful episodes — blue-near (3) / green-near (5)
-# excluded, see module docstring.
 TASK_PROMPTS = {
     0: "move the red block to the far side",
     1: "move the red block to the near side",
     2: "move the blue block to the far side",
+    3: "move the blue block to the near side",
     4: "move the green block to the far side",
+    5: "move the green block to the near side",
 }
 
 

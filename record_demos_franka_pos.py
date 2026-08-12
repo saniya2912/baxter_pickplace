@@ -321,6 +321,23 @@ def collect_episode(model, data, task_cfg: dict, renderer, joint_ranges, viewer=
                    0.0, imgs, wrists, states, actions,
                    tol=0.05, timeout_steps=50, **kwargs)
 
+    # Phase 2a.5: orientation-alignment, green only. run_cart_phase (2a) only
+    # controls position, never orientation, so without this the ~10deg
+    # orientation error left over from Q_MID_GREEN's approach gets corrected
+    # *while* descending in phase 2b -- the still-open fingers sweep sideways
+    # during that correction and knock the block ~2.5cm off before the arm
+    # centers on it (diagnosed via frame-by-frame contact trace, block jumps
+    # position the instant finger contact starts mid-descent). Fixing
+    # orientation here, while still safely above the block, means phase 2b's
+    # descent is dominantly vertical. Scoped to green only: applying it to
+    # all blocks regressed blue (blue-far 42.5%->15%, blue-near 72.5%->45%
+    # in a 20-trial test) -- red/blue's approach geometry doesn't have this
+    # orientation-error-during-descent problem in the first place.
+    if block == "green":
+        run_cart_phase_6d(model, data, renderer, site_id, above_tgt, target_quat,
+                          q_mid, 0.0, imgs, wrists, states, actions,
+                          tol=0.008, timeout_steps=40, **kwargs)
+
     block_pos = data.qpos[block_adr:block_adr + 3].copy()
 
     # Phase 2b: 6D descent to grasp height. timeout raised from 50 to 100 —
