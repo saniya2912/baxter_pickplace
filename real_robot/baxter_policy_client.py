@@ -85,6 +85,19 @@ def _unpack_object_hook(obj):
         return np.dtype(obj[b"dtype"]).type(obj[b"data"])
     return obj
 
+
+def _to_text(s):
+    """Force a unicode/str object. On Python 2, plain str (== bytes) packs as
+    msgpack bin-type under use_bin_type=True, which the Python-3 server then
+    decodes back as `bytes` -- producing a dict with a mix of `str` and
+    `bytes` keys once the server merges in its own (str-keyed) entries, which
+    crashes JAX's pytree key sorting. Converting text fields to unicode here
+    makes msgpack encode them as str-type instead, matching what the server
+    expects."""
+    if isinstance(s, bytes):
+        return s.decode("utf-8")
+    return s
+
 # ── Constants — must match inference_pos_v3.py exactly ───────────────────────
 JOINT_NAMES = [
     'right_s0', 'right_s1', 'right_e0', 'right_e1',
@@ -313,9 +326,9 @@ class BaxterPolicyClient(object):
                 self._stop_arm()
 
                 obs = {
-                    "observation/wrist_image": np.transpose(self._wrist_img, (2, 0, 1)),
-                    "observation/state":       state,
-                    "prompt":                  self.prompt,
+                    u"observation/wrist_image": np.transpose(self._wrist_img, (2, 0, 1)),
+                    u"observation/state":       state,
+                    u"prompt":                  _to_text(self.prompt),
                 }
 
                 t0 = time.time()

@@ -49,6 +49,19 @@ def _unpack_object_hook(obj):
         return np.dtype(obj[b"dtype"]).type(obj[b"data"])
     return obj
 
+
+def _to_text(s):
+    """Force a unicode/str object. On Python 2, plain str (== bytes) packs as
+    msgpack bin-type under use_bin_type=True, which the Python-3 server then
+    decodes back as `bytes` -- producing a dict with a mix of `str` and
+    `bytes` keys once the server merges in its own (str-keyed) entries, which
+    crashes JAX's pytree key sorting. Converting text fields to unicode here
+    makes msgpack encode them as str-type instead, matching what the server
+    expects."""
+    if isinstance(s, bytes):
+        return s.decode("utf-8")
+    return s
+
 IMG_SIZE = 224
 
 TASKS = {
@@ -84,10 +97,10 @@ def main():
     dummy_state = np.zeros(11, dtype=np.float32)
 
     obs = {
-        "observation/image":       dummy_img,
-        "observation/wrist_image": dummy_img,
-        "observation/state":       dummy_state,
-        "prompt":                  prompt,
+        u"observation/image":       dummy_img,
+        u"observation/wrist_image": dummy_img,
+        u"observation/state":       dummy_state,
+        u"prompt":                  _to_text(prompt),
     }
 
     print("Sending dummy observation (task {}: '{}') ...".format(args.task, prompt))
