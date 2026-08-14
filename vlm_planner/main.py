@@ -3,21 +3,24 @@
 Workflow:
   1. Load Gemma-3-12B VLM.
   2. Place all three blocks at the given --initial configuration.
-  3. Render current scene; compare to --goal image.
-  4. VLM plans the task sequence.
-  5. Execute each task with the pi0.5 position-control policy.
-  6. Re-check goal after each task; replan if needed.
+  3. VLM plans the task sequence from symbolic (text) current/goal state --
+     NOT images. See vlm_planner.py's plan_tasks_symbolic() docstring: an
+     image-order-swap test proved the VLM wasn't grounding visual
+     near/far judgments in the images at all for this task (a capability
+     ceiling, not a prompt bug), so state now comes from the simulator's own
+     ground truth instead of being perceived by the VLM.
+  4. Execute each task with the pi0.5 position-control policy.
+  5. Re-check goal after each task (plain dict comparison, no VLM call --
+     both states are already ground truth); replan if needed.
 
 Prerequisites:
-  # Terminal 1 — policy server
+  # Terminal 1 — policy server (v4b run2: the first checkpoint with all six
+  # tasks working, unlike v3 which is 0% on both green tasks)
   cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
-  uv run scripts/serve_policy.py policy:checkpoint \\
-      --policy.config pi05_baxter_pickplace_pos_v3 \\
-      --policy.dir checkpoints/pi05_baxter_pickplace_pos_v3/run1/199999
-
-  # Generate goal images (once)
-  cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
-  uv run python ~/Desktop/saniya_ws/baxter_pickplace/render_goal_images_6task.py
+  XLA_PYTHON_CLIENT_PREALLOCATE=false uv run scripts/serve_policy.py --port 8000 policy:checkpoint \\
+      --policy.config pi05_baxter_pickplace_pos_v4b \\
+      --policy.dir checkpoints/pi05_baxter_pickplace_pos_v4b/run2/99999 \\
+      --policy.norm-stats-repo-id local/baxter_pickplace_pos_v4b_task0
 
   # Terminal 2 — run planner
   cd ~/Desktop/saniya_ws/pi0.5_mujoco/openpi
@@ -39,10 +42,8 @@ import pathlib
 import sys
 
 import cv2
-import numpy as np
 
 HERE     = pathlib.Path(__file__).parent
-GOAL_DIR = HERE / "goal_images_6task"
 
 # All 8 three-block goal configurations
 GOAL_NAMES = [
@@ -63,19 +64,16 @@ def _parse_goal_x(goal_name: str) -> tuple[float, float, float]:
     return red_x, blue_x, green_x
 
 
-def load_goal_image(goal_name: str) -> np.ndarray:
-    path = GOAL_DIR / f"{goal_name}.png"
-    if not path.exists():
-        sys.exit(
-            f"[ERROR] Goal image not found: {path}\n"
-            f"Generate goal images with:\n"
-            f"  uv run python ~/Desktop/saniya_ws/baxter_pickplace/"
-            f"render_goal_images_6task.py"
-        )
-    img = cv2.imread(str(path))
-    if img is None:
-        sys.exit(f"[ERROR] Failed to read goal image: {path}")
-    return img
+def _parse_goal_state(goal_name: str) -> dict[str, str]:
+    """Extract the {color: near|far} symbolic goal state from a goal name string."""
+    parts = goal_name.split("_")
+    return {"red": parts[1], "blue": parts[3], "green": parts[5]}
+
+
+def _parse_task(task: str) -> tuple[str, str]:
+    """'move the red block to the far side' -> ('red', 'far')."""
+    words = task.split()
+    return words[2], words[6]
 
 
 def main():
@@ -107,17 +105,21 @@ def main():
         "--max-rounds", type=int, default=3,
         help="Maximum plan→execute rounds before giving up (default: 3)",
     )
+    parser.add_argument(
+        "--max-subtask-retries", type=int, default=5,
+        help="Max attempts to retry a single subtask before moving on (default: 5)",
+    )
     args = parser.parse_args()
 
     sys.path.insert(0, str(HERE))
-    from vlm_planner import load_model, plan_tasks, check_goal_reached
+    from vlm_planner import load_model, plan_tasks_symbolic, check_goal_reached_symbolic
     from sim_runner  import SimRunner
 
     # ── Load VLM ──────────────────────────────────────────────────────────────
     processor, vlm_model = load_model()
 
-    # ── Load goal image ───────────────────────────────────────────────────────
-    goal_bgr = load_goal_image(args.goal)
+    # ── Goal state (symbolic, no image needed) ─────────────────────────────────
+    goal_state = _parse_goal_state(args.goal)
     print(f"[Main] Goal: {args.goal}")
 
     # ── Launch sim and place blocks at the given initial configuration ────────
@@ -131,9 +133,9 @@ def main():
         # ── Plan the first round headless (no viewer window yet), so we can
         # print a clear goal / initial / steps summary before the window
         # appears rather than while the first VLM query is still running. ──
-        current_bgr  = runner.get_vlm_image_bgr()
-        goal_reached = check_goal_reached(current_bgr, goal_bgr, processor, vlm_model)
-        tasks        = [] if goal_reached else plan_tasks(current_bgr, goal_bgr, processor, vlm_model)
+        current_state = runner.get_symbolic_state()
+        goal_reached   = check_goal_reached_symbolic(current_state, goal_state)
+        tasks          = [] if goal_reached else plan_tasks_symbolic(current_state, goal_state, processor, vlm_model)
 
         print(f"\n[Main] {'='*60}")
         print(f"[Main] Goal    : {args.goal}")
@@ -154,9 +156,9 @@ def main():
             print(f"\n[Main] ── Round {round_idx + 1} / {args.max_rounds} ──")
 
             if round_idx > 0:
-                current_bgr  = runner.get_vlm_image_bgr()
-                goal_reached = check_goal_reached(current_bgr, goal_bgr, processor, vlm_model)
-                tasks        = [] if goal_reached else plan_tasks(current_bgr, goal_bgr, processor, vlm_model)
+                current_state = runner.get_symbolic_state()
+                goal_reached   = check_goal_reached_symbolic(current_state, goal_state)
+                tasks          = [] if goal_reached else plan_tasks_symbolic(current_state, goal_state, processor, vlm_model)
 
             if goal_reached:
                 print("[Main] Goal already reached!")
@@ -169,14 +171,29 @@ def main():
             for i, t in enumerate(tasks, 1):
                 print(f"  {i}. {t}")
 
-            for task in tasks:
-                current_bgr = runner.run_task(task)
-                if check_goal_reached(current_bgr, goal_bgr, processor, vlm_model):
+            for i, task in enumerate(tasks, 1):
+                color, dest = _parse_task(task)
+                print(f"\n[Main] >>> Subtask {i}/{len(tasks)}: {task}")
+                subtask_ok = False
+                for attempt in range(1, args.max_subtask_retries + 1):
+                    runner.run_task(task, target_color=color)
+                    current_state = runner.get_symbolic_state()
+                    subtask_ok = current_state[color] == dest
+                    status = "OK" if subtask_ok else "failed"
+                    print(f"[Main]     attempt {attempt}/{args.max_subtask_retries}: "
+                          f"{color}={current_state[color]}  [{status}]")
+                    if subtask_ok:
+                        break
+                final_status = "OK" if subtask_ok else f"GAVE UP after {args.max_subtask_retries} attempts"
+                print(f"[Main] <<< Subtask {i}/{len(tasks)} result: {color}={current_state[color]}  [{final_status}]")
+
+                if check_goal_reached_symbolic(current_state, goal_state):
                     print(f"[Main] Goal reached after: '{task}'")
                     goal_reached = True
                     break
             else:
-                goal_reached = check_goal_reached(current_bgr, goal_bgr, processor, vlm_model)
+                current_state = runner.get_symbolic_state()
+                goal_reached  = check_goal_reached_symbolic(current_state, goal_state)
                 if goal_reached:
                     print("[Main] Goal reached after all planned tasks.")
                 else:

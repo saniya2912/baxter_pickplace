@@ -17,16 +17,21 @@ import rospy
 import baxter_interface
 from baxter_interface import CHECK_VERSION
 
-# Home joint angles for the right arm — matches the MuJoCo keyframe "home".
-# Units: radians. Adjust if the real robot's home differs from simulation.
+# Home joint angles for the right arm — matches the MuJoCo keyframe "home" in
+# models/baxter_twoblocks.xml exactly (qpos order s0 s1 e0 e1 w0 w1 w2):
+#   <key name="home" qpos="... 0 -0.9599 0 2.0 0 0.7854 0 0.020833 -0.020833 ..."/>
+# Previous values here (-0.08, -1.00, 0.00, 1.51, -0.02, 0.57, -0.01) did NOT
+# match the keyframe -- e1 was off by ~0.49 rad (~28 deg) and w1 by ~0.21 rad
+# (~12 deg), so every real trial was starting from a meaningfully different
+# pose than training/eval ever used. See 13aug_physical.md Sec 8.
 HOME_ANGLES = {
-    'right_s0': -0.08,
-    'right_s1': -1.00,
-    'right_e0':  0.00,
-    'right_e1':  1.51,
-    'right_w0': -0.02,
-    'right_w1':  0.57,
-    'right_w2': -0.01,
+    'right_s0': 0.0,
+    'right_s1': -0.9599,
+    'right_e0': 0.0,
+    'right_e1': 2.0,
+    'right_w0': 0.0,
+    'right_w1': 0.7854,
+    'right_w2': 0.0,
 }
 
 

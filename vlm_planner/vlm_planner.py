@@ -1,6 +1,6 @@
 """Gemma-3 VLM planner for Baxter pick-and-place tasks (6-task, 3-block version).
 
-Given a current scene image and a goal scene image, determines the ordered
+Given a current scene state and a goal scene state, determines the ordered
 sequence of pick-and-place tasks needed to transform the current state into
 the goal state.
 
@@ -11,6 +11,11 @@ Tasks are constrained to the 6 policy capabilities (red / blue / green × near /
   - "move the blue block to the near side"
   - "move the green block to the far side"
   - "move the green block to the near side"
+
+State input is SYMBOLIC (text), not image-based -- see plan_tasks_symbolic()'s
+docstring for why. The original image-comparison functions (plan_tasks,
+check_goal_reached, _labeled_bgr_to_pil, etc.) are kept below for reference /
+in case image-based comparison is revisited, but are no longer used by main.py.
 """
 
 import re
@@ -249,3 +254,92 @@ def check_goal_reached(current_bgr: np.ndarray, goal_bgr: np.ndarray,
                                  _CHECK_PROMPT, MAX_TOKENS_CHECK)
     print(f"[VLM check] response: {response}")
     return response.strip().upper().startswith("YES")
+
+
+# ── Symbolic (text-state) planning ───────────────────────────────────────────
+#
+# The functions above ask the VLM to visually compare two images of the scene
+# and judge each block's near/far position from pixels. A controlled test
+# (swapping which image was labeled CURRENT vs GOAL) produced IDENTICAL output
+# -- proof the model wasn't actually grounding its answer in the images at all
+# for this fine-grained synthetic-scene comparison task, just pattern-matching
+# on something else (prompt structure, position in context, etc.). That's a
+# capability ceiling, not a prompt-engineering problem -- confirmed after also
+# fixing two genuine bugs first (oblique-vs-top-down camera mismatch, FOV
+# clipping the green block), which helped but didn't fix the underlying issue.
+#
+# Below: the state itself now comes from the simulator's own ground truth
+# (SimRunner.get_symbolic_state(), reading qpos directly) instead of being
+# perceived by the VLM from an image. The VLM's job shrinks to a text
+# reasoning task it's actually good at -- given two symbolic state
+# descriptions, produce the task list that transforms one into the other --
+# rather than a visual grounding task it demonstrably isn't.
+
+_PLAN_PROMPT_TEMPLATE = """\
+You control a robot arm that moves colored blocks between two zones on a \
+table: "near" and "far".
+
+Current block positions:
+  red: {cur_red}
+  blue: {cur_blue}
+  green: {cur_green}
+
+Goal block positions:
+  red: {goal_red}
+  blue: {goal_blue}
+  green: {goal_green}
+
+For every block whose current position differs from its goal position, \
+output one line in exactly this format:
+move the <color> block to the <far|near> side
+
+Only include blocks that actually need to move. Output nothing else -- no \
+explanation, no extra text, no blank lines."""
+
+
+def _query_text(processor, model, text: str, max_new_tokens: int) -> str:
+    messages = [{"role": "user", "content": [{"type": "text", "text": text}]}]
+    text_prompt = processor.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    inputs = processor(text=[text_prompt], return_tensors="pt").to(
+        model.device, dtype=torch.bfloat16
+    )
+    with torch.no_grad():
+        output_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+        )
+    n_input = inputs["input_ids"].shape[1]
+    return processor.decode(output_ids[0][n_input:], skip_special_tokens=True).strip()
+
+
+def plan_tasks_symbolic(
+    current_state: dict[str, str], goal_state: dict[str, str], processor, model
+) -> list[str]:
+    """Query the VLM with a text-only prompt describing current/goal block
+    positions (near/far per color), and return the ordered task list. No
+    images involved -- see module docstring above for why."""
+    prompt = _PLAN_PROMPT_TEMPLATE.format(
+        cur_red=current_state["red"], cur_blue=current_state["blue"], cur_green=current_state["green"],
+        goal_red=goal_state["red"], goal_blue=goal_state["blue"], goal_green=goal_state["green"],
+    )
+    response = _query_text(processor, model, prompt, max_new_tokens=150)
+    print(f"[VLM plan] raw response:\n{response}")
+
+    tasks = []
+    for line in response.lower().splitlines():
+        m = re.match(r"\s*move the (red|blue|green) block to the (near|far) side\s*", line)
+        if m:
+            color, dest = m.group(1), m.group(2)
+            tasks.append(f"move the {color} block to the {dest} side")
+    return tasks
+
+
+def check_goal_reached_symbolic(
+    current_state: dict[str, str], goal_state: dict[str, str]
+) -> bool:
+    """Direct dict comparison -- both states are ground truth (no perception
+    involved), so there's no ambiguity for a VLM query to resolve here."""
+    return current_state == goal_state

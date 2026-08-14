@@ -359,6 +359,23 @@ session's eval comparisons, so it was kept intact.
 
 ### 8.2 A real memory leak in LeRobotDataset, not a config problem
 
+**What "OOM-killed" means**: OOM = Out Of Memory. When total memory usage across
+all processes on the machine gets critically low, the Linux kernel has a
+built-in safety mechanism — the OOM killer — that picks whichever process looks
+like the worst offender and force-terminates it (`SIGKILL`) to protect the rest
+of the system from locking up entirely. This is not the process failing on its
+own logic or throwing a normal exception; it's killed externally by the OS with
+no chance to clean up, mid-execution, the instant available memory runs out. The
+kernel logs exactly which process it killed and how much memory it was using at
+the time, e.g. (from one of the attempts below):
+
+```
+Out of memory: Killed process 1571276 (python3) total-vm:54152080kB, anon-rss:24932588kB, ...
+```
+
+(`anon-rss` here ≈ 24.9GB — the process's actual resident memory usage at the
+moment of the kill, on a 30GB-RAM machine.)
+
 With disk space available, converting all 1464 episodes into one
 `local/baxter_pickplace_pos_v4b` dataset (same pattern as v4's converter, just
 uncapped) got OOM-killed by the kernel three times in a row, each time further
@@ -442,6 +459,113 @@ doesn't fully detach the process from job control. `disown` was added as a
 precaution for the long-running training job even though the root cause of that
 specific dead-process incident wasn't fully confirmed.
 
-Results pending — will update this section once the 100k-step run completes and
-`eval_checkpoint.py` is re-run for a fourth data point in the comparison table
-(§7).
+Results: see §9 — the first eval of this checkpoint (`run1`) uncovered a second,
+deeper bug in the mixture serving path, documented fully in
+`before_final_retrain_for_6tasks.md`. `run2` (§9) is the corrected version.
+
+---
+
+## 9. The mixture-serving normalization bug, and the corrected retrain (`run2`)
+
+### 9.1 First eval of v4b (`run1`) — broken
+
+Ran `eval_checkpoint.py` against `run1/99999` and got 9/60 = 15.0% (90% on
+red-far, the task whose norm stats happened to be selected for serving; 0% on
+every other task). Root-caused to two separate bugs in `LeRobotMixtureDataConfig`
+(`openpi/src/openpi/training/config.py`):
+
+**Bug A (fixed in place, permanent correctness fix)**: `_finish_create()` builds
+the mixture's top-level `DataConfig` — the one `serve_policy.py` actually reads at
+inference time — from bare `DataConfig()` defaults, and never set
+`use_quantile_norm`. It silently stayed `False` (the class default), while every
+sub-config correctly computed `True` (required for any pi0.5 model). Training read
+each sub-config individually (correct), so training itself was never affected —
+but serving read only the top-level config (wrong), so a model trained with
+quantile normalization got served with mean/std normalization: same stats values,
+wrong formula, producing near-zero/garbage actions despite healthy training loss.
+Fixed by threading `use_quantile_norm=model_config.model_type != ModelType.PI0`
+from `create()` into `_finish_create()`. Confirmed in isolation: re-serving `run1`
+(no retraining) with just this fix took task 0 from 0/10 to 9/10 — but every other
+task still failed, which led to bug B.
+
+**Bug B (root cause of the remaining failures)**: `norm_stats_for()` (used via
+`serve_policy.py --policy.norm-stats-repo-id`) was designed for the
+cross-embodiment case, where a serving session only ever talks to *one robot* —
+picking one fixed embodiment's norm stats for the session is correct there. v4b
+isn't cross-embodiment, though — it's **one robot, six different tasks**, each
+with independently-computed norm stats that differ meaningfully (e.g. task 0's
+shoulder-joint mean is +0.42, task 2's is -0.17, reflecting genuinely different
+reach geometry per block/direction). A server can only apply one fixed
+normalization for its whole lifetime, but `eval_checkpoint.py` sends all six
+tasks' prompts through that same server. Whichever task's stats were selected
+works; every other task gets that task's stats misapplied to its own, different
+action distribution — hence 90%/0%/0%/0%/0%/0%.
+
+This also puts the earlier `pi05_cross_embodiment_pickplace` (Franka/G1) near-0%
+result in question, since bug A applied there too — flagged as an open item for a
+future re-eval, not yet re-run (see `before_final_retrain_for_6tasks.md` §5). Bug
+B, notably, does NOT apply to that case — one-robot-per-session is the *correct*
+assumption for genuinely different embodiments, it's only wrong for v4b's
+one-robot-many-tasks setup.
+
+### 9.2 Fix for bug B: pooled norm stats, full retrain
+
+No code-level fix was possible without changing what "serving a mixture" means —
+instead, eliminated the *need* for per-task norm-stats selection entirely: computed
+**one pooled norm-stats set across all 1464 episodes** (all 6 per-task datasets,
+un-weighted — i.e. not per-task independent stats, one shared mean/std/q01/q99)
+and wrote the identical result into all 6 asset directories, overwriting the six
+different per-task ones. New script: `openpi/scripts/compute_pooled_norm_stats_v4b.py`
+(reuses `normalize.RunningStats`, the same online accumulator
+`compute_norm_stats.py` uses, just fed all six datasets sequentially into one
+shared accumulator instead of one each). Verified all 6 resulting `norm_stats.json`
+files are byte-identical (`md5sum` match).
+
+This required a **full retrain from scratch**, not just re-serving `run1` with
+patched stats — `run1`'s weights were learned specifically against the six
+*different* per-task normalizations, so swapping in pooled stats without
+retraining would just move the same train/serve mismatch to a new layer.
+Warm-started again from `checkpoints/pi05_baxter_pickplace_pos_v4/run1/199999/params`
+(same lineage as the original v4b attempt — not from v3), same recipe otherwise
+(`peak_lr=5e-5, warmup=100, decay_steps=100_000, num_train_steps=100_000`).
+Launched as `--exp-name run2` (not `run1`) specifically to preserve the original
+checkpoint as documented evidence of the bug, rather than overwriting it. Took
+~7h (17:05 start, ~00:06 finish, matching the original v4b run's pace almost
+exactly — 4.0 it/s throughout).
+
+One operational note along the way: found a live `serve_policy_realsense.py`
+process (v3, real-robot serving) holding 24.7GB GPU right before launch —
+confirmed with the user it was safe to stop before proceeding, rather than
+assuming.
+
+### 9.3 Final eval — `pos_v4b_run2_99999`
+
+| Task | v1 | v2 | v3 | v4 | v4b run1 (broken) | **v4b run2 (fixed)** |
+|---|---|---|---|---|---|---|
+| red-far | 10% | 60% | 90% | 70% | 90% | 50% |
+| red-near | 20% | 40% | 40% | 30% | 0% | 20% |
+| blue-far | 80% | 70% | 90% | 60% | 0% | 70% |
+| blue-near | 0% | 50% | 40% | 30% | 0% | 30% |
+| green-far | 10% | 20% | 0% | 30% | 0% | **70%** |
+| green-near | 0% | 0% | 0% | 10% | 0% | 10% |
+| **overall** | 20.0% | 40.0% | 43.3% | 38.3% | 15.0% (invalid) | **41.7%** |
+
+Sanity-checked before running the full sweep: per-trial `block_x` final positions
+across the first four tasks showed real, varied movement (spread across
+0.59-0.82), not the frozen-at-exactly-the-start-position pattern every trial
+showed under the broken `run1` — confirming the fix generalized before spending
+time on the full 60-trial sweep.
+
+**Green-far reached 70%** — not just "no longer zero" (the original ask from this
+whole experiment) but the best green performance of any checkpoint by a wide
+margin (previous best was v4's 30%). Overall success (41.7%) is second only to
+v3 (43.3%), and unlike v3, no task is stuck at 0%. Red-far/red-near dipped
+slightly versus v4 (70%→50%, 30%→20%) despite `v4b` having roughly 2x more
+red/blue training data than v4 — at n=10 trials this is plausibly within normal
+run-to-run variance rather than a real regression, not investigated further.
+
+**Bottom line**: `v4b run2` is the first checkpoint in this whole lineage where
+every one of the six tasks is genuinely functional (no zeros), and it resolves
+both the original question this experiment set out to answer (does
+success-filtered, complete, balanced data fix green — yes) and the mixture-serving
+bug that nearly buried that result under a false negative.

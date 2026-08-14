@@ -154,7 +154,46 @@ right there, unlike v4b's one-robot-many-tasks case). So cross-embodiment re-eva
 would only need the already-applied 2a-i fix, not the pooled-stats work in §3. Worth
 re-running `run_cross_embodiment_eval_sweep.sh` at some point to check.
 
-## 6. Immediate next step (deferred, not blocking)
+## 6. Update: the §3 plan has been executed
 
-Real-robot work on `v3` for the single brown-block task takes priority right now.
-This retrain is picked back up later — starting point is §3 above.
+Resumed same day. Steps taken, in order:
+
+1. Wrote `scripts/compute_pooled_norm_stats_v4b.py` (openpi repo) — pools all 6
+   per-task datasets' state/action arrays into one shared `RunningStats`
+   accumulator (same class `compute_norm_stats.py` uses, just fed all six
+   datasets sequentially instead of one), then writes the identical resulting
+   `norm_stats.json` into all 6 asset directories
+   (`assets/pi05_baxter_pickplace_pos_v4b_task{0..5}/local/.../norm_stats.json`),
+   overwriting the six independent ones that caused bug 2b-ii.
+2. Verified all 6 files are now byte-identical (`md5sum` match across all six).
+3. Found a live `serve_policy_realsense.py` process (v3, started same day) holding
+   24.7GB GPU before launching — checked with the user whether real-robot work was
+   active; confirmed safe to stop, killed it, GPU came back fully free.
+4. Launched the retrain: same `pi05_baxter_pickplace_pos_v4b` `TrainConfig` (no
+   config changes needed — the pooled stats live in the asset files the config
+   already points to), warm-started from `checkpoints/pi05_baxter_pickplace_pos_v4/run1/199999/params`
+   (same lineage choice as before, not from v3), **`--exp-name run2`** (not
+   `run1`) so yesterday's `run1/99999` checkpoint — the empirical evidence behind
+   the whole bug diagnosis — stays intact rather than being overwritten.
+   `--no-wandb-enabled` (required for non-interactive launch). Confirmed stepping
+   normally: ~3.8-4.0 it/s, ETA ~7h15m from launch.
+
+**Still to do once training finishes** (`checkpoints/pi05_baxter_pickplace_pos_v4b/run2/99999`):
+
+- Serve with `--policy.norm-stats-repo-id local/baxter_pickplace_pos_v4b_task0`
+  (or any of the six — now identical, so it no longer matters which one is picked).
+- Run `eval_checkpoint.py` (10 trials × 6 tasks, same protocol as every prior
+  version) — this time expecting all six tasks to work, not just task 0.
+- Update `filtered_6task_finetune.md`'s comparison table with the result
+  (currently has v1/v2/v3/v4/v4b-run1(broken) — add v4b-run2).
+- If this works, `v4b/run2` becomes the candidate for real-robot deployment on
+  all 6 tasks (v3 remains the pick for red/blue-only work in the meantime, e.g.
+  the single brown-block task).
+
+## 7. Resolved
+
+Done. `v4b/run2` eval: 50%/20%/70%/30%/70%/10% (red-far/red-near/blue-far/
+blue-near/green-far/green-near), 41.7% overall — every task non-zero, green-far
+at 70% (best of any checkpoint, vs. v4's previous-best 30%). Full writeup and
+final comparison table in `filtered_6task_finetune.md` §9. This doc's plan is
+fully executed; nothing else pending here.
