@@ -67,7 +67,8 @@ overlay (`Demos collected: N/50`, current phase, controls reminder).
 2. Press the **upper button** again to stop teaching.
    (Press the **lower button** any time during teaching to abort and retry
    this demo instead.)
-3. Press **'r'** in the UI window when you're ready -- the arm then replays
+3. Press **'r'** in the UI window when you're ready -- the arm first moves
+   (on its own) to the taught trajectory's own starting pose, then replays
    the trajectory under program control while capturing camera + state +
    action data. Don't touch the arm during this part.
 4. Episode saves automatically, then the arm resets to the fixed home pose

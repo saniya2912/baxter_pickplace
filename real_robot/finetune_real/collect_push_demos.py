@@ -12,9 +12,13 @@ Workflow, per episode
    gripping the cuff) -- physically push the arm through one demonstration.
    Cuff upper button again stops recording. Cuff lower button aborts/redoes
    the current teach instead of stopping it.
-2. REPLAY + CAPTURE: press 'r' in the UI window to start (arm is free to be
-   left as-is or nudged until you're ready). The raw teach trajectory is
-   resampled to a 10 Hz waypoint sequence and replayed using Baxter's
+2. REPLAY + CAPTURE: press 'r' in the UI window to start. The arm first
+   moves (blocking, move_to_joint_positions) to the taught trajectory's own
+   recorded starting pose -- without this, replay would start from
+   wherever teaching happened to end, not where it began, turning the
+   first several seconds of every episode into the arm snapping back to
+   the start before the real motion plays. Then the raw teach trajectory
+   is resampled to a 10 Hz waypoint sequence and replayed using Baxter's
    built-in joint-position controller (set_joint_positions -- same approach
    as Wei/script/new_run.py's playback), not a hand-rolled velocity
    P-controller -- tracks the taught trajectory far more faithfully.
@@ -404,7 +408,22 @@ class DemoCollector(object):
 
     # ── Replay + capture phase ──────────────────────────────────────────────
 
+    def _move_to_start(self, waypoints):
+        """Move to the taught trajectory's own recorded starting pose before
+        replay begins. Without this, replay starts from wherever the arm
+        happened to be left after teaching (not necessarily where teaching
+        itself began) and the first several seconds of every episode become
+        the arm snapping back to waypoints[0] before the actual taught
+        motion starts -- polluting the recording with an unintended extra
+        movement."""
+        self._show_ui("MOVING TO TRAJECTORY START ...")
+        rospy.loginfo("Moving to taught trajectory's starting pose...")
+        start_positions = {name: float(waypoints[0][j]) for j, name in enumerate(JOINT_NAMES)}
+        self._limb.move_to_joint_positions(start_positions, timeout=15.0)
+
     def replay_and_capture(self, waypoints):
+        self._move_to_start(waypoints)
+
         imgs, wrists, states, qvels, actions = [], [], [], [], []
         rate = rospy.Rate(CONTROL_HZ)
 
