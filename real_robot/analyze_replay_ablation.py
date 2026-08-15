@@ -66,9 +66,9 @@ def main():
     print_error_table("TRACKING error (target waypoint vs actual replay -- P-controller lag):", err_tracking)
     print_error_table("OVERALL fidelity (raw teach vs actual replay -- what you see by eye):", err_overall)
 
-    print("\nIf 'Resampling error' is near zero but 'TRACKING error' is large, the P-controller "
-          "(KP=40, VEL_LIMIT=1.5) can't keep up with how fast you taught it -- try teaching more "
-          "slowly, or the control gains need retuning.")
+    print("\nIf 'Resampling error' is near zero but 'TRACKING error' is large, replay's control "
+          "law (Baxter's built-in set_joint_positions) still can't keep up with how fast you "
+          "taught it -- try teaching more slowly, or this needs a different fix.")
 
     if args.no_plot:
         return

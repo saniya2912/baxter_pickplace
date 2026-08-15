@@ -5,7 +5,10 @@ Real-robot policy client for the pi0.5 Baxter pick-and-place policy.
 
 Replaces the MuJoCo simulation client. Connects to the policy server
 running on the lab PC, reads observations from the real Baxter robot,
-and executes returned action chunks via the P-controller.
+and executes returned action chunks via Baxter's built-in joint-position
+controller (set_joint_positions -- same approach as
+Wei/script/new_run.py's playback, and matches how the training data for
+this policy was collected in finetune_real/collect_push_demos.py).
 
 The workspace/scene camera is a RealSense attached directly to the lab PC,
 not this machine -- the server injects "observation/image" itself (see
@@ -109,9 +112,6 @@ REPLAN_STEPS  = 10       # execute this many actions before requesting new chunk
 MAX_STEPS     = 600      # stop after this many steps regardless
 CONTROL_HZ    = 10       # Hz — matches training data frequency
 
-KP            = 40.0     # P-controller gain (rad/s per rad error)
-VEL_LIMIT     = 1.5      # rad/s — max joint velocity
-
 # Gripper latch logic (mirrors inference_pos_v3.py)
 GRASP_OPEN_THRESH    = 0.3   # gripper_norm below this = "was open"
 GRASP_CLOSE_THRESH   = 0.5   # gripper_norm above this = "closing"
@@ -183,11 +183,6 @@ class BaxterPolicyClient(object):
             rospy.loginfo("Calibrating gripper...")
             self._gripper.calibrate()
 
-        # Set velocity command timeout to 1 s (default is 0.2 s).
-        # This prevents the controller reverting to position mode during the
-        # ~100 ms inference gap between action chunks.
-        self._limb.set_command_timeout(1.0)
-
         # ── Camera subscriber ─────────────────────────────────────────────────
         rospy.loginfo("Subscribing to wrist camera...")
         rospy.Subscriber(wrist_topic, Image, self._cb_wrist, queue_size=1)
@@ -239,17 +234,6 @@ class BaxterPolicyClient(object):
         state = np.concatenate([q, [gripper_norm], ee])
         return state, q, gripper_norm
 
-    # ── P-controller ──────────────────────────────────────────────────────────
-
-    def _p_controller(self, q_current, q_target):
-        """Convert joint position targets to velocity commands."""
-        vel = {}
-        for i, name in enumerate(JOINT_NAMES):
-            v = KP * (q_target[i] - q_current[i])
-            v = float(np.clip(v, -VEL_LIMIT, VEL_LIMIT))
-            vel[name] = v
-        return vel
-
     # ── Gripper latch logic (matches inference_pos_v3.py) ─────────────────────
 
     def _execute_gripper(self, prev_gripper_norm, gripper_norm_target):
@@ -274,9 +258,7 @@ class BaxterPolicyClient(object):
     # ── Safe stop ─────────────────────────────────────────────────────────────
 
     def _stop_arm(self):
-        zero_vel = {j: 0.0 for j in JOINT_NAMES}
         try:
-            self._limb.set_joint_velocities(zero_vel)
             self._limb.exit_control_mode()
         except Exception:
             pass
@@ -353,10 +335,13 @@ class BaxterPolicyClient(object):
             q_target = action[:7].astype(np.float64)
             gripper_norm_target = float(action[7]) if len(action) > 7 else 0.5
 
-            state, q_current, prev_gripper_norm = self._get_state()
+            state, _, prev_gripper_norm = self._get_state()
 
-            vel = self._p_controller(q_current, q_target)
-            self._limb.set_joint_velocities(vel)
+            # Baxter's built-in joint-position controller (matches
+            # finetune_real/collect_push_demos.py's replay and
+            # Wei/script/new_run.py's playback).
+            positions = {name: float(q_target[i]) for i, name in enumerate(JOINT_NAMES)}
+            self._limb.set_joint_positions(positions)
             self._execute_gripper(prev_gripper_norm, gripper_norm_target)
 
             step += 1

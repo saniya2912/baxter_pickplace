@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Ablation: does the replay P-controller actually track a taught trajectory?
+Ablation: does replay actually track a taught trajectory?
 
 Records one kinesthetic teach (same recording logic as
 finetune_real/collect_push_demos.py), resamples it to 10 Hz waypoints, then
-replays it with the IDENTICAL P-controller (KP, VEL_LIMIT, CONTROL_HZ) used
-there -- but this time logs the ACTUAL measured joint angles during replay
-at a much higher rate than the 10 Hz control loop itself, via a background
+replays it with the IDENTICAL control law used there -- Baxter's built-in
+joint-position controller (set_joint_positions), not a hand-rolled velocity
+P-controller -- and logs the ACTUAL measured joint angles during replay at
+a much higher rate than the 10 Hz control loop itself, via a background
 thread. That gives three independent traces to compare:
 
   1. what you actually did by hand (teach_raw.csv, 100 Hz)
@@ -20,13 +21,13 @@ either a resampling artifact (1 vs 2 disagree) or a control-tracking
 problem (2 vs 3 disagree), rather than guessed at.
 
 No gripper, no HDF5 -- purely a joint-trajectory diagnostic. Otherwise
-mirrors collect_push_demos.py's actual interaction pattern exactly: cuff
-upper button starts/stops teaching, then a cv2 UI window gates replay on
-pressing 'r' (not another cuff press) -- same as the real script, on
-purpose, since the wait-for-'r' gap and whatever drift happens during it
-is one of the things worth being able to see in the logged data. No
-reset-to-home is inserted between teach-stop and replay-start (only before
-the very first teach), also matching the real script.
+mirrors collect_push_demos.py's interaction pattern: cuff upper button
+starts/stops teaching, then a cv2 UI window gates replay on pressing 'r'
+(not another cuff press) -- same as the real script. Unlike the real
+script, this resets to home BOTH before teaching and before replay, so
+each phase starts from a known, identical pose -- isolating pure
+tracking/resampling error from any drift accumulated during the
+wait-for-'r' gap.
 
 Usage
 -----
@@ -66,8 +67,6 @@ JOINT_NAMES = [
 CONTROL_HZ = 10       # matches collect_push_demos.py / baxter_policy_client.py
 TEACH_HZ = 100
 REPLAY_LOG_HZ = 50    # background logging rate during replay -- independent of the control loop
-KP = 40.0
-VEL_LIMIT = 1.5
 
 # Same as move_to_home.py / collect_push_demos.py's HOME_ANGLES.
 HOME_ANGLES = {
@@ -227,20 +226,16 @@ class ReplayAblation(object):
         rate = rospy.Rate(CONTROL_HZ)
         for i in range(len(waypoints) - 1):
             q_target = waypoints[i + 1]
-            q_current = self._get_q()
-            vel = {}
-            for j, name in enumerate(JOINT_NAMES):
-                v = KP * (q_target[j] - q_current[j])
-                vel[name] = float(np.clip(v, -VEL_LIMIT, VEL_LIMIT))
-            self._limb.set_joint_velocities(vel)
+            # Baxter's built-in joint-position controller (matches
+            # collect_push_demos.py / baxter_policy_client.py / new_run.py).
+            positions = {name: float(q_target[j]) for j, name in enumerate(JOINT_NAMES)}
+            self._limb.set_joint_positions(positions)
             self._show_ui("REPLAYING -- step {}/{}".format(i + 1, len(waypoints) - 1))
             if self._quit_requested:
                 rospy.logwarn("Quit requested mid-replay -- stopping arm.")
                 break
             rate.sleep()
 
-        zero_vel = {j: 0.0 for j in JOINT_NAMES}
-        self._limb.set_joint_velocities(zero_vel)
         self._limb.exit_control_mode()
 
         stop_event.set()
@@ -277,6 +272,8 @@ def main():
             return
 
         target_times, waypoints = test.resample(teach_samples)
+
+        test.reset_to_home()
         replay_log = test.replay(target_times, waypoints)
         if replay_log is None:
             rospy.logwarn("Replay aborted -- nothing to save.")

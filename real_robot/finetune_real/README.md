@@ -92,19 +92,29 @@ Each `data/push_demos/episode_NNNN.hdf5`:
 observations/image        (T, 3, 224, 224) uint8  -- lab PC RealSense (scene)
 observations/wrist_image  (T, 3, 224, 224) uint8  -- Baxter wrist camera
 observations/state        (T, 11) float32          -- 7 joints + gripper_norm + EE xyz
+observations/qvel         (T, 7) float32            -- measured joint velocity (rad/s)
 actions                   (T, 8) float32            -- 7 joint targets + gripper_norm
 metadata.attrs["success"]              = True
 metadata.attrs["language_instruction"] = "push the block to the far side"
 ```
-Identical schema to `data/pickplace_pos_v3/episode_*.hdf5` (see
-`convert_to_lerobot_pos_v3.py`), so the existing LeRobot conversion script
-needs only a copy-and-rename (new `repo_id`, new source directory) to ingest
-this dataset -- not a rewrite.
+`observations/qvel` is new relative to `data/pickplace_pos_v3/episode_*.hdf5`
+(see `convert_to_lerobot_pos_v3.py`) -- recorded so a future switch to
+velocity-conditioned state/control doesn't require re-collecting the whole
+dataset. `image`/`wrist_image`/`state`/`actions`/`metadata` are otherwise
+identical, so the existing LeRobot conversion script needs a copy-and-rename
+(new `repo_id`, new source directory) plus deciding whether to include
+`qvel` in the LeRobot `state` feature or leave it unused for now -- not a
+rewrite.
 
 Action convention matches the sim data: the action at step `t` is the
-**target joint configuration at t+1**, executed via the same P-controller
-(`KP=40`, `vel_limit=1.5 rad/s`) used everywhere else in this project,
-including by the trained policy at inference time.
+**target joint configuration at t+1**, executed via Baxter's built-in
+joint-position controller (`set_joint_positions` -- same approach as
+`Wei/script/new_run.py`'s playback), matching how `baxter_policy_client.py`
+executes the trained policy's outputs at deployment. Switched from an
+earlier hand-rolled velocity P-controller (KP/VEL_LIMIT), which was
+suspected of lagging behind fast teach segments -- see
+`ablation_replay_test.py` / `analyze_replay_ablation.py` for the
+diagnostic tooling that can confirm tracking quality either way.
 
 ## 5. Not yet built (next steps once ~50 demos exist)
 

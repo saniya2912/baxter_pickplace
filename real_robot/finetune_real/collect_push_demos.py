@@ -14,15 +14,16 @@ Workflow, per episode
    the current teach instead of stopping it.
 2. REPLAY + CAPTURE: press 'r' in the UI window to start (arm is free to be
    left as-is or nudged until you're ready). The raw teach trajectory is
-   resampled to a 10 Hz waypoint sequence and replayed using the SAME P-controller
-   (KP=40, vel_limit=1.5 rad/s) that baxter_policy_client.py uses to execute
-   a trained policy's outputs -- deliberately, so the control law that
-   produces the action labels in this dataset matches the control law that
-   will later execute the trained policy, keeping training and deployment
-   consistent. At each 10 Hz step: fetch a scene frame from the lab PC's
-   realsense_frame_server.py, read the wrist camera + joint state locally,
-   and log the step. Action label at step t = the waypoint at t+1 (matches
-   the "future joint target" convention already used for the sim data).
+   resampled to a 10 Hz waypoint sequence and replayed using Baxter's
+   built-in joint-position controller (set_joint_positions -- same approach
+   as Wei/script/new_run.py's playback), not a hand-rolled velocity
+   P-controller -- tracks the taught trajectory far more faithfully.
+   baxter_policy_client.py's deployment execution was updated to match, so
+   training and deployment still use the same control law. At each 10 Hz
+   step: fetch a scene frame from the lab PC's realsense_frame_server.py,
+   read the wrist camera + joint state locally, and log the step. Action
+   label at step t = the waypoint at t+1 (matches the "future joint target"
+   convention already used for the sim data).
 3. SAVE: episode written as HDF5 in the exact schema
    convert_to_lerobot_pos_v3.py already expects
    (observations/image, observations/wrist_image, observations/state (T,11),
@@ -110,8 +111,6 @@ JOINT_NAMES = [
 IMG_SIZE     = 224
 CONTROL_HZ   = 10        # replay + capture rate -- matches deployment
 TEACH_HZ     = 100       # raw teach-trajectory recording rate
-KP           = 40.0
-VEL_LIMIT    = 1.5
 GRIPPER_CLOSED_NORM = 1.0  # gripper stays closed the whole episode (pushing task)
 LANGUAGE_INSTRUCTION = "push the block to the far side"
 
@@ -232,8 +231,6 @@ class DemoCollector(object):
         except Exception as e:
             rospy.logwarn("Gripper setup failed (%s) -- ignoring, assuming closed by hand.", e)
 
-        self._limb.set_command_timeout(1.0)
-
         rospy.Subscriber(args.wrist_topic, Image, self._cb_wrist, queue_size=1)
 
         self._io_upper = baxter_interface.DigitalIO('right_upper_button')
@@ -269,6 +266,10 @@ class DemoCollector(object):
     def _get_q(self):
         angles = self._limb.joint_angles()
         return np.array([angles[j] for j in JOINT_NAMES], dtype=np.float64)
+
+    def _get_qdot(self):
+        vels = self._limb.joint_velocities()
+        return np.array([vels[j] for j in JOINT_NAMES], dtype=np.float32)
 
     def _get_state(self):
         q = self._get_q()
@@ -404,13 +405,14 @@ class DemoCollector(object):
     # ── Replay + capture phase ──────────────────────────────────────────────
 
     def replay_and_capture(self, waypoints):
-        imgs, wrists, states, actions = [], [], [], []
+        imgs, wrists, states, qvels, actions = [], [], [], [], []
         rate = rospy.Rate(CONTROL_HZ)
 
         for i in range(len(waypoints) - 1):
             q_target = waypoints[i + 1]
 
             state = self._get_state()
+            qvel = self._get_qdot()                            # (7,) float32 -- measured joint velocity
             scene_img = self._frame_client.latest()          # (3, H, W) uint8
             wrist_img = np.transpose(self._wrist_img, (2, 0, 1)).astype(np.uint8) \
                 if self._wrist_img is not None else np.zeros((3, IMG_SIZE, IMG_SIZE), dtype=np.uint8)
@@ -420,6 +422,7 @@ class DemoCollector(object):
             imgs.append(scene_img)
             wrists.append(wrist_img)
             states.append(state)
+            qvels.append(qvel)
             actions.append(action)
 
             self._show_ui("REPLAYING + CAPTURING #{} -- step {}/{}".format(
@@ -429,23 +432,18 @@ class DemoCollector(object):
                 self._stop_arm()
                 return None
 
-            # Execute one 10 Hz P-controller step toward q_target.
-            q_current = self._get_q()
-            vel = {}
-            for j, name in enumerate(JOINT_NAMES):
-                v = KP * (q_target[j] - q_current[j])
-                vel[name] = float(np.clip(v, -VEL_LIMIT, VEL_LIMIT))
-            self._limb.set_joint_velocities(vel)
+            # Execute one 10 Hz step toward q_target using Baxter's built-in
+            # joint-position controller (matches Wei/script/new_run.py).
+            positions = {name: float(q_target[j]) for j, name in enumerate(JOINT_NAMES)}
+            self._limb.set_joint_positions(positions)
 
             rate.sleep()
 
         self._stop_arm()
-        return (np.stack(imgs), np.stack(wrists), np.stack(states), np.stack(actions))
+        return (np.stack(imgs), np.stack(wrists), np.stack(states), np.stack(qvels), np.stack(actions))
 
     def _stop_arm(self):
-        zero_vel = {j: 0.0 for j in JOINT_NAMES}
         try:
-            self._limb.set_joint_velocities(zero_vel)
             self._limb.exit_control_mode()
         except Exception:
             pass
@@ -457,13 +455,17 @@ class DemoCollector(object):
 
     # ── Save ─────────────────────────────────────────────────────────────────
 
-    def save_episode(self, imgs, wrists, states, actions):
+    def save_episode(self, imgs, wrists, states, qvels, actions):
         path = os.path.join(self._out_dir, "episode_{:04d}.hdf5".format(self._next_index))
         with h5py.File(path, "w") as f:
             obs = f.create_group("observations")
             obs.create_dataset("image", data=imgs, compression="gzip")
             obs.create_dataset("wrist_image", data=wrists, compression="gzip")
             obs.create_dataset("state", data=states)
+            # Measured joint velocity (rad/s), not used by convert_to_lerobot_pos_v3.py's
+            # existing schema -- recorded so a future switch to velocity-conditioned
+            # state/control doesn't require re-collecting the whole dataset.
+            obs.create_dataset("qvel", data=qvels)
             f.create_dataset("actions", data=actions)
             meta = f.create_group("metadata")
             meta.attrs["success"] = True
@@ -498,8 +500,8 @@ class DemoCollector(object):
             if result is None:
                 continue  # quit requested mid-replay, arm already stopped, exiting anyway
 
-            imgs, wrists, states, actions = result
-            self.save_episode(imgs, wrists, states, actions)
+            imgs, wrists, states, qvels, actions = result
+            self.save_episode(imgs, wrists, states, qvels, actions)
             self._reset_to_home()
 
         rospy.loginfo("Stopping. Collected %d episode(s) total in %s.",
