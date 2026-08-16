@@ -693,3 +693,138 @@ Written to `openpi/assets/pi05_franka_pickplace_pos/local/franka_pickplace_pos/`
   `create_mixture_data_loader` function)
 - `assets/pi05_franka_pickplace_pos/local/franka_pickplace_pos/` — new (norm stats)
 - `assets/pi05_g1_pickplace_pos/local/g1_pickplace_pos/` — new (norm stats)
+
+---
+
+## 11. Follow-up session (2026-08-11 to 2026-08-15): data fixes, retraining, eval regression
+
+Everything in §1-10 above is the original session. This section covers a later session
+that (a) found and fixed the root causes behind §9's "known limitations," (b)
+re-recorded/re-converted both datasets, and (c) retrained Franka and G1 solo — but
+surfaced a result worth flagging rather than a clean win.
+
+### 11.1 Root-cause fixes for the two broken combos
+
+**Franka green-near (was 3.3% yield, §4 pattern not diagnosed before this session):**
+the "above" hover phase (`run_cart_phase`) only ever controlled position, never
+orientation. By the time the 6D descent phase started, there was a real ~10deg
+orientation error left over, and that error got corrected *while* descending toward
+the block — the still-open gripper fingers swept sideways during that correction and
+knocked the block ~2.5cm off before the arm could center on it (confirmed via
+frame-by-frame contact tracing: block position jumps the instant finger contact
+starts mid-descent, well before the gripper closes). **Fix**: added an
+orientation-alignment sub-phase at hover height, immediately before the descent,
+*scoped to green only* — applying it to all three colors was tried first and
+regressed blue (blue-far 42.5%->15%, blue-near 72.5%->45% in a 20-trial test), so
+red/blue's approach geometry apparently doesn't have this problem in the first place.
+Result: green-near 3.3%->~60-65%, green-far 25%->~80% (both measured in-session,
+~10-20 trial batches).
+
+**G1 blue-near / green-near (were 0%, §4.11's "genuine reach-envelope limit" —
+that conclusion turned out to be wrong):** `Q_MID_BLUE`/`Q_MID_GREEN` had only ever
+been searched against the *far-side* spawn corner and were reused unchanged for
+near-side tasks, where the block actually spawns at the *opposite, harder* corner
+(near-destination tasks start the block at `X_FAR`, not `X_NEAR` — see
+`record_demos_g1_pos.py`'s `base_x = X_NEAR if dest=="far" else X_FAR`). An offline
+global IK search (300 random restarts + coordinate hill-climb) targeting the correct
+near-side spawn corner found both are fully position-reachable (0 residual). First
+attempt at fixing this made the same mistake the original code did — searched
+against the *destination* x=0.60 instead of the *spawn* x=0.75 — caught only because
+green-near improved under it but blue-near barely did, which didn't make sense until
+traced back to the wrong target. Second attempt, searched correctly against x=0.75,
+found: green-near needs almost no orientation compromise (0.6-0.7deg off pure
+top-down) and its fix was clean (`Q_MID_GREEN_NEAR`, standard `TARGET_QUAT`).
+Blue-near has a genuine ~19deg position/orientation trade-off at that corner —
+using a *relaxed* target orientation (the tilted quat the optimal `Q_MID_BLUE_NEAR`
+itself naturally settles at, `TARGET_QUAT_BLUE_NEAR`) instead of fighting toward
+pure top-down took it from ~13-25% (still fighting the trade-off) to ~73% (matching
+green-near). Both fixes are scoped by `(block, dest)` and can't affect any other
+task's `Q_MID`/orientation target. Also found and fixed a second, unrelated bug while
+doing this: `convert_to_lerobot_g1.py`'s `TASK_PROMPTS` dict was hardcoded to only 4
+of 6 tasks (a stale leftover from when blue-near/green-near genuinely had zero
+successes) — first conversion run after the recording fix silently produced a G1
+LeRobot dataset missing those two tasks entirely (455 episodes instead of 699).
+
+### 11.2 Re-recorded data, all 6 tasks x2 robots now >=100 successful episodes
+
+Large-batch recording re-run with both fixes in place, sized to reach >=100
+successes/task (existing episodes kept, new ones appended). Verified by reading the
+`success` attribute directly out of every HDF5 file, not just recorder yield logs:
+
+| Task | Franka | G1 |
+|---|---|---|
+| red-far | 120 | 115 |
+| red-near | 106 | 115 |
+| blue-far | 109 | 115 |
+| blue-near | 109 | 128 |
+| green-far | 113 | 110 |
+| green-near | 136 | 116 |
+
+Re-ran `convert_to_lerobot_franka.py` / `convert_to_lerobot_g1.py` (with the
+`TASK_PROMPTS` fix) and `compute_norm_stats.py` for both configs. Current LeRobot
+datasets:
+- `local/franka_pickplace_pos`: 693 episodes, 119,101 frames, all 6 tasks
+  (106-136 episodes/task).
+- `local/g1_pickplace_pos`: 699 episodes, 119,121 frames, all 6 tasks
+  (110-128 episodes/task).
+
+### 11.3 Retraining: Franka + G1 solo as `run2`; cross-embodiment deliberately NOT retrained
+
+Discovered mid-session that `run1` checkpoints already existed and were fully trained
+(cross-embodiment through 299999, Franka/G1 solo through 99999) — these were the
+checkpoints behind the negative-transfer eval sweep in the original session
+(0%/2.5% cross-embodiment collapse vs 41.7%/62.5% solo, measured against the old
+broken/incomplete data). Retrained Franka solo and G1 solo from scratch (fresh from
+`pi05_base`, same as `run1` — `run2` is a checkpoint-directory name, not a resume)
+on the fixed datasets, saved as `run2` so `run1` stays intact for comparison.
+**Cross-embodiment `run2` was explicitly NOT launched** (left at `run1` only) per
+user instruction — the queue script had it queued third, and had to be stopped by an
+active log-watcher that killed the process within ~2s of it starting, since editing
+the already-running queue script's later lines didn't reliably take effect.
+
+Both solo retrains hit two rounds of OOM (`kernel: Out of memory: Killed process`,
+confirmed via `journalctl`) before finally completing — the pi0.5 checkpoint restore
+step alone peaks around 18-20GB host RAM, and this machine (30GB total) was under
+memory pressure from unrelated concurrent jobs (`convert_to_lerobot_pos_v4b.py`, a
+live `serve_policy.py` instance). Not a bug in this project's code — worth knowing
+about for future runs on this machine: check `free -h` has >20GB available before
+launching `scripts/train.py`.
+
+### 11.4 Eval sweep on `run2` — regression on already-working tasks, not a clean win
+
+`run_eval_sweep_run2.sh` (new script, same serve+eval pattern as
+`run_cross_embodiment_eval_sweep.sh`), 10 trials/task. G1 evaluated on all 6 tasks
+this time (the original sweep only tested 0,1,2,4 since 3,5 had no training data).
+
+| Task | Franka run1 | Franka run2 | G1 run1 | G1 run2 |
+|---|---|---|---|---|
+| red-far | -* | 30% | 90% | 50% |
+| red-near | -* | 20% | 80% | 60% |
+| blue-far | -* | 20% | 60% | 40% |
+| blue-near | -* | 30% | 0%** | 40% |
+| green-far | -* | 20% | 20% | 40% |
+| green-near | -* | 10% | 0%** | 30% |
+| **Overall** | **41.7%** (per-task breakdown not on hand) | **21.7%** | **62.5%** (4 tasks) | **43.3%** (6 tasks) |
+
+\* Franka run1's per-task breakdown wasn't pulled in this session, only the 41.7%
+overall figure (25/60) from the original eval sweep.
+\** run1 had zero training data for these two — untestable, effectively 0%.
+
+**Two things, not one clean story:**
+1. **Real capability win**: G1 blue-near and green-near went from impossible
+   (no data existed) to 40%/30% — a task that literally could not succeed before now
+   sometimes does.
+2. **Real regression**: on every task both checkpoints could attempt, `run2` is
+   meaningfully worse than `run1` — Franka's overall nearly halved (41.7%->21.7%),
+   G1's red/blue tasks each dropped 20-40 points (only green-far improved, 20%->40%).
+   More data (5-6x more episodes for the tasks that were already working) and a real
+   bug fix produced a *worse* policy on the tasks that already worked before.
+
+**Not yet diagnosed — open question for next session.** Candidate explanations not
+yet checked: (a) the near/far task-count balance shifted between run1 and run2's
+datasets and may now favor different tasks than before, (b) the LR schedule
+(`peak_lr=2e-4, warmup_steps=500`, same fresh-from-base recipe used for run1) may not
+suit the ~5x larger dataset, (c) 10 trials/task is a small sample and some of this
+could be eval noise rather than a real training regression — would want a
+larger-n rerun on at least one task before concluding the regression is real. Do not
+treat `run2` as a strict upgrade over `run1` without resolving this.
